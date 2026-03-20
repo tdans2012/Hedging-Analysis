@@ -1,0 +1,16 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Renewable Variability & Electricity Price Risk",
+    "section": "",
+    "text": "This case study quantifies how wind and solar generation variability drives day-ahead electricity price risk in Germany and the Nordic bidding zones. It is structured in four stages:\n\nWeather → Generation — ERA5 wind and irradiance to capacity factor models\nPrice Decomposition — attributing price variance to its physical drivers\n\nRisk Quantification — VaR and CVaR for a stylised renewable portfolio\nPolicy Implications — connecting findings to the ENTSO-E hedging framework\n\nData sources: SMARD (Bundesnetzagentur, CC BY 4.0), ENTSO-E Transparency Platform, Copernicus ERA5 reanalysis."
+  },
+  {
+    "objectID": "index.html#project-summary",
+    "href": "index.html#project-summary",
+    "title": "Renewable Variability & Electricity Price Risk",
+    "section": "",
+    "text": "This case study quantifies how wind and solar generation variability drives day-ahead electricity price risk in Germany and the Nordic bidding zones. It is structured in four stages:\n\nWeather → Generation — ERA5 wind and irradiance to capacity factor models\nPrice Decomposition — attributing price variance to its physical drivers\n\nRisk Quantification — VaR and CVaR for a stylised renewable portfolio\nPolicy Implications — connecting findings to the ENTSO-E hedging framework\n\nData sources: SMARD (Bundesnetzagentur, CC BY 4.0), ENTSO-E Transparency Platform, Copernicus ERA5 reanalysis."
+  }
+]

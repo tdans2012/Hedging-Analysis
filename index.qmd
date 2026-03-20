@@ -1,0 +1,18 @@
+---
+title: "Renewable Variability & Electricity Price Risk"
+subtitle: "A European power market case study using SMARD, ENTSO-E, and Copernicus ERA5"
+---
+
+## Project Summary
+
+This case study quantifies how wind and solar generation variability 
+drives day-ahead electricity price risk in Germany and the Nordic 
+bidding zones. It is structured in four stages:
+
+1. **Weather → Generation** — ERA5 wind and irradiance to capacity factor models
+2. **Price Decomposition** — attributing price variance to its physical drivers  
+3. **Risk Quantification** — VaR and CVaR for a stylised renewable portfolio
+4. **Policy Implications** — connecting findings to the ENTSO-E hedging framework
+
+*Data sources: SMARD (Bundesnetzagentur, CC BY 4.0), ENTSO-E 
+Transparency Platform, Copernicus ERA5 reanalysis.*

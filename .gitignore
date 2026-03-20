@@ -1,0 +1,49 @@
+# R artefacts
+.Rhistory
+.RData
+.Rproj.user/
+
+# Rendered HTML logs (stored as GitHub Actions artifacts instead)
+logs/*.html
+
+# Local data cache (pulled on demand, not stored in repo)
+data/
+
+# Serialised model objects if large
+models/*.rds
+models/*.qs
+
+# Belt-and-braces: catch any accidentally placed credential files
+*.Renviron
+*api_key*
+*_auth*
+*_pw*
+
+# Raw data — too large for git and contains no code
+data/raw/
+
+# Quarto render cache
+.quarto/
+*_cache/
+*_files/
+
+# R environment
+.Rproj.user/
+.Rhistory
+.RData
+
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+/.quarto/
+**/*.quarto_ipynb
+.Rproj.user
+.httr-oauth
+.quarto

@@ -1,0 +1,25 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Renewable Variability & Electricity Price Risk"
+  description: "A case study in weather-driven price risk across European power markets"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Overview
+      - href: 01_data.qmd
+        text: "1. Data"
+      - href: 02_weather.qmd
+        text: "2. Weather → Generation"
+      - href: 03_prices.qmd
+        text: "3. Price Decomposition"
+      - href: 04_risk.qmd
+        text: "4. Risk & Hedging"
+      - href: about.qmd
+        text: About
+  page-footer:
+    center: |
+      Data: [SMARD (CC BY 4.0)](https://www.smard.de) · 
+      [ENTSO-E](https://transparency.entso
