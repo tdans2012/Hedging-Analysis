@@ -72,11 +72,18 @@ smard_get_chunk <- function(filter_id,
                             timestamp,
                             region     = SMARD_REGION,
                             resolution = SMARD_RESOLUTION) {
+#  url <- glue::glue(
+#    "{SMARD_BASE}/chart_data/{filter_id}/{region}/",
+#    "{filter_id}_{region}_{resolution}_{timestamp}.json"
+#  )
+
+
   url <- glue::glue(
     "{SMARD_BASE}/chart_data/{filter_id}/{region}/",
-    "{filter_id}_{region}_{resolution}_{timestamp}.json"
-  )
+    "{filter_id}_{region}_{resolution}_{format(timestamp, scientific = FALSE)}.json"
+  )  
   
+    
   # Some index timestamps don't have data — return NULL on 404
   resp <- tryCatch(
     request(url) |>
