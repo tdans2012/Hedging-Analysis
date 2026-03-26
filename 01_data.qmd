@@ -1,0 +1,430 @@
+---
+title: "Data Sources & Quality Assurance"
+subtitle: "SMARD · ENTSO-E · Copernicus ERA5 — hourly, 2020–2025"
+description: |
+  A structured inventory of the three primary data sources used throughout 
+  this analysis, including coverage checks, distributional profiling, and 
+  a documented treatment of the one material irregularity: reporting-window 
+  gaps in ENTSO-E cross-border physical flows.
+---
+
+```{r}
+#| label: r-setup
+#| message: false
+#| warning: false
+#| include: false
+
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE
+)
+
+library(tidyverse)
+library(arrow)
+library(scales)
+library(patchwork)
+
+theme_set(
+  theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold", size = 13),
+      plot.subtitle = element_text(colour = "grey40", size = 10),
+      plot.caption = element_text(colour = "grey50", size = 8),
+      strip.text = element_text(face = "bold"),
+      panel.grid.minor = element_blank()
+    )
+)
+```
+
+## Overview
+
+This page inventories every dataset feeding the analysis pipeline and documents
+their temporal coverage, resolution, and quality. The objective is twofold:
+give the reader confidence that the raw materials are sound, and establish a
+clean, aligned hourly time index that all downstream stages can join on without
+surprises.
+
+Three sources contribute:
+
+| Source | Domain | Resolution | Period | Access |
+|--------|--------|------------|--------|--------|
+| **SMARD** (BNetzA) | DE-LU prices, generation by fuel type, load | 15 min / hourly | 2020–2025 | REST API (CC BY 4.0) |
+| **ENTSO-E** Transparency | Day-ahead prices (multi-zone), cross-border flows, generation | Hourly | 2020–2025 | `entsoe-py` → Parquet |
+| **Copernicus ERA5** | 100 m wind speed, surface solar irradiance, 2 m temperature | Hourly | 2020–2025 | `cdsapi` → NetCDF → Parquet |
+
+All timestamps are stored in UTC. Timezone-aware joins (particularly across
+CET/CEST boundaries) are handled at the point of analysis, not in the raw
+files.
+
+
+## 1.0 SMARD (DE-LU) {#sec-smard}
+
+SMARD is the Bundesnetzagentur's public market-data portal for Germany–
+Luxembourg. It provides the highest-resolution view of the German power
+system: generation by source, total load, and day-ahead prices at 15-minute
+granularity.
+
+```{r}
+#| label: smard-data
+#| code-summary: "SMARD ingestion & profile"
+
+smard <- read_parquet("data/processed/smard/smard_DE-LU_2020_2025.parquet")
+
+tibble(
+  Metric = c("Rows", "Columns", "First timestamp (UTC)", 
+             "Last timestamp (UTC)", "Total NAs"),
+  Value  = c(
+    format(nrow(smard), big.mark = ","),
+    ncol(smard),
+    as.character(min(smard$datetime_utc)),
+    as.character(max(smard$datetime_utc)),
+    sum(is.na(smard))
+  )
+) |> knitr::kable()
+```
+
+```{r}
+#| label: smard-na-counts
+#| code-summary: "Column-level NA counts"
+
+enframe(colSums(is.na(smard)), name = "Column", value = "NAs") |>
+  knitr::kable()
+```
+
+### 1.1 Distributions {#sec-smard-dists}
+
+```{r}
+#| label: fig-smard-distributions
+#| fig-cap: "Marginal distributions of all SMARD variables (DE-LU, 2020–2025, hourly)."
+#| fig-width: 10
+#| fig-height: 8
+#| code-summary: "Histogram facets"
+
+smard |>
+  select(-datetime_utc) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "value") |>
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 80, fill = "steelblue", alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  labs(
+    title = "SMARD (DE-LU) variable distributions",
+    subtitle = "2020–2025, hourly resolution",
+    x = NULL, y = "Count",
+    caption = "Source: SMARD / Bundesnetzagentur (CC BY 4.0)"
+  )
+```
+
+**Takeaway:** The SMARD dataset is complete with no missing values across the
+full 2020–2025 window. Price distributions exhibit the expected heavy right
+tail (scarcity events) and occasional negative prices (renewable surplus hours).
+Generation variables show the characteristic bimodal structure of wind output
+and the zero-inflated daytime peak of solar.
+
+
+## 2.0 ERA5 Reanalysis (DE-LU zone) {#sec-era5}
+
+Copernicus ERA5 provides the meteorological backbone of the analysis: the
+physical weather drivers that determine how much renewable generation the
+installed fleet can produce in any given hour. Variables were downloaded at
+native 0.25° resolution and aggregated to a DE-LU zone average using
+cosine-latitude area weighting.
+
+```{r}
+#| label: era5-data
+#| code-summary: "ERA5 ingestion & profile"
+
+era5 <- read_parquet("data/processed/era5/DE-LU.parquet")
+
+tibble(
+  Metric = c("Rows", "Columns", "First timestamp (UTC)", 
+             "Last timestamp (UTC)", "Total NAs"),
+  Value  = c(
+    format(nrow(era5), big.mark = ","),
+    ncol(era5),
+    as.character(min(era5$datetime_utc)),
+    as.character(max(era5$datetime_utc)),
+    sum(is.na(era5))
+  )
+) |> knitr::kable()
+```
+
+### 2.1 Temporal continuity check {#sec-era5-gaps}
+
+A critical assumption for all downstream modelling is that the ERA5 series has
+no gaps — every hour in the analysis window must be present exactly once.
+
+```{r}
+#| label: era5-gap-check
+#| code-summary: "Gap detection"
+
+era5_ts <- era5 |>
+  arrange(datetime_utc) |>
+  mutate(gap_hours = as.numeric(difftime(datetime_utc, lag(datetime_utc), units = "hours")))
+
+gap_tab <- table(era5_ts$gap_hours)
+cat("Hour-gap distribution:\n")
+print(gap_tab)
+
+if (all(names(gap_tab) %in% c("NA", "1"))) {
+  cat("\n✓ No gaps detected — series is contiguous at hourly resolution.\n")
+} else {
+  cat("\n⚠ Non-unit gaps found — investigate before proceeding.\n")
+}
+```
+
+### 2.2 Distributions {#sec-era5-dists}
+
+```{r}
+#| label: fig-era5-distributions
+#| fig-cap: "ERA5 variable distributions (DE-LU, 2020–2025). Solar irradiance filtered to daytime hours (> 0 W/m²) to reveal the non-trivial part of the distribution."
+#| fig-width: 9
+#| fig-height: 7
+#| code-summary: "ERA5 histograms"
+
+p_all <- era5 |>
+  select(-datetime_utc) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "value") |>
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 80, fill = "steelblue", alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free", ncol = 2) +
+  labs(
+    title = "ERA5 (DE-LU) — all hours",
+    x = NULL, y = "Count"
+  )
+
+p_daytime <- era5 |>
+  select(-datetime_utc) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "value") |>
+  mutate(
+    variable = case_when(
+      variable == "ssrd_wm2" & value > 0 ~ "ssrd_wm2 (daytime only)",
+      TRUE ~ variable
+    )
+  ) |>
+  filter(!(variable == "ssrd_wm2" & value == 0)) |>
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 80, fill = "steelblue", alpha = 0.7) +
+  facet_wrap(~ variable, scales = "free", ncol = 2) +
+  labs(
+    title = "ERA5 (DE-LU) — SSRD filtered to daytime",
+    x = NULL, y = "Count",
+    caption = "Source: Copernicus ERA5 reanalysis (Hersbach et al., 2020)"
+  )
+
+p_all / p_daytime
+```
+
+**Takeaway:** ERA5 is complete and contiguous. Wind speed distributions are
+right-skewed (as expected for a Weibull-distributed variable), and 2 m
+temperature shows the familiar bimodal winter/summer structure of a
+continental-temperate climate. Surface solar irradiance is zero-inflated by
+nighttime hours; the daytime-filtered panel reveals the unimodal distribution
+that will drive the capacity factor model.
+
+
+## 3.0 ENTSO-E Transparency Platform {#sec-entsoe}
+
+ENTSO-E supplies three datasets used in this project: day-ahead prices across
+multiple bidding zones, cross-border physical flows, and actual generation by
+production type. All were fetched via `entsoe-py` and stored as Parquet.
+
+### 3.1 Day-ahead prices {#sec-entsoe-prices}
+
+```{r}
+#| label: entsoe-prices-data
+#| code-summary: "ENTSO-E price profile"
+
+prices <- read_parquet("data/processed/entsoe/prices_2020_2025.parquet")
+
+tibble(
+  Metric = c("Rows", "Columns (zones + timestamp)", 
+             "First timestamp (UTC)", "Last timestamp (UTC)", "Total NAs"),
+  Value  = c(
+    format(nrow(prices), big.mark = ","),
+    ncol(prices),
+    as.character(min(prices$datetime_utc)),
+    as.character(max(prices$datetime_utc)),
+    sum(is.na(prices))
+  )
+) |> knitr::kable()
+```
+
+```{r}
+#| label: entsoe-prices-summary
+#| code-summary: "Price summary statistics (EUR/MWh)"
+
+prices |>
+  select(-datetime_utc) |>
+  summary() |> t() |>
+  knitr::kable()
+```
+
+
+### 3.2 Cross-border physical flows {#sec-flows}
+
+Cross-border flows are the one dataset with a material data-quality issue.
+Several flow pairs — particularly those involving Denmark (DK_1, DK_2) and
+France — exhibit extended periods of complete missingness.
+
+```{r}
+#| label: entsoe-flows-data
+#| code-summary: "Flow dataset profile"
+
+flows <- read_parquet("data/processed/entsoe/crossborder_flows_2020_2025.parquet")
+
+tibble(
+  Metric = c("Rows", "Flow pairs", "First timestamp (UTC)", 
+             "Last timestamp (UTC)"),
+  Value  = c(
+    format(nrow(flows), big.mark = ","),
+    ncol(flows) - 1,
+    as.character(min(flows$datetime_utc)),
+    as.character(max(flows$datetime_utc))
+  )
+) |> knitr::kable()
+```
+
+```{r}
+#| label: entsoe-flows-na-counts
+#| code-summary: "Non-zero NA counts by flow pair"
+
+na_counts <- colSums(is.na(flows))
+na_nonzero <- na_counts[na_counts > 0]
+
+if (length(na_nonzero) > 0) {
+  enframe(na_nonzero, name = "Flow pair", value = "Missing hours") |>
+    mutate(
+      `% missing` = percent(
+        `Missing hours` / nrow(flows), accuracy = 0.1
+      )
+    ) |>
+    arrange(desc(`Missing hours`)) |>
+    knitr::kable()
+} else {
+  cat("No missing values found.\n")
+}
+```
+
+#### 3.2.1 Diagnosing the gap pattern {#sec-flows-diagnosis}
+
+The heatmap below shows the monthly NA rate for every flow pair. The pattern is
+consistent with a **change in ENTSO-E reporting granularity or data provider
+switchover** rather than random data loss: gaps begin (or end) cleanly at
+month boundaries and affect entire flow pairs simultaneously.
+
+```{r}
+#| label: fig-flows-na-heatmap
+#| fig-cap: "Monthly NA rate by cross-border flow pair. Blue = complete, red = missing. Gaps align with calendar boundaries, suggesting a reporting-window change rather than random data loss."
+#| fig-width: 10
+#| fig-height: 7
+#| code-summary: "Flow NA heatmap"
+
+flows |>
+  mutate(month = lubridate::floor_date(datetime_utc, "month")) |>
+  select(-datetime_utc) |>
+  group_by(month) |>
+  summarise(across(everything(), ~ mean(is.na(.x))), .groups = "drop") |>
+  pivot_longer(-month, names_to = "flow_pair", values_to = "pct_missing") |>
+  ggplot(aes(x = month, y = flow_pair, fill = pct_missing)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "steelblue", mid = "white", high = "firebrick",
+    midpoint = 0.5, limits = c(0, 1),
+    labels = percent,
+    name = "% Missing"
+  ) +
+  scale_x_datetime(date_breaks = "6 months", date_labels = "%b\n%Y") +
+  labs(
+    title = "ENTSO-E cross-border flow data availability",
+    subtitle = "Monthly NA rate by flow pair",
+    x = NULL, y = NULL,
+    caption = "Source: ENTSO-E Transparency Platform via entsoe-py"
+  ) +
+  theme(
+    axis.text.y = element_text(size = 7),
+    panel.grid = element_blank()
+  )
+```
+
+
+
+#### 3.2.2 Treatment strategy {#sec-flows-treatment}
+
+The gaps affect a subset of flow pairs (primarily DK and FR interconnectors)
+and are concentrated in specific calendar windows. For downstream modelling
+in Stages 2–3, we adopt the following approach:
+
+1. **Core flow pairs** (AT, CH, CZ, NL, PL ↔ DE-LU) are complete or
+   near-complete across the full window and will be used without imputation.
+2. **Partially available pairs** (DK, FR, Nordic interconnectors) will be
+   included only in time windows where they are available. The net export
+   feature constructed in Stage 2 will sum over whichever pairs are non-missing
+   at each timestamp.
+3. **No imputation** is applied to flow data. Imputing cross-border flows
+   would inject false precision into a variable that is itself a market outcome
+   — it is preferable to let the regression handle partial coverage via the
+   summed net-export feature.
+
+This is a conservative approach. It means the net export variable will
+undercount total physical flows during gap periods, which may attenuate its
+estimated coefficient in the price regression. We flag this as a known
+limitation in the Stage 2 discussion.
+
+
+### 3.3 Actual generation by production type {#sec-entsoe-generation}
+
+```{r}
+#| label: entsoe-generation-inventory
+#| code-summary: "Generation file inventory"
+
+gen_files <- list.files("data/processed/entsoe", 
+                        pattern = "generation_", full.names = TRUE)
+
+map_dfr(gen_files, function(f) {
+  df <- read_parquet(f)
+  tibble(
+    File   = basename(f),
+    Rows   = format(nrow(df), big.mark = ","),
+    Cols   = ncol(df),
+    From   = as.character(min(df$datetime_utc)),
+    To     = as.character(max(df$datetime_utc)),
+    NAs    = sum(is.na(df))
+  )
+}) |> knitr::kable()
+```
+
+::: {.callout-note title="Nuclear generation and Germany's Atomausstieg"}
+If nuclear generation columns contain NAs or zeros from mid-2023 onward, this
+is not a data-quality issue — it reflects the completion of Germany's nuclear
+phase-out (*Atomausstieg*). Three reactors (Brokdorf, Grohnde, and
+Gundremmingen C) were permanently shut down on 31 December 2021, halving the
+remaining fleet. The final three plants — Emsland, Isar 2, and
+Neckarwestheim 2 — operated in fuel stretch-out mode (no new fuel elements
+permitted) until they were disconnected from the grid on 15 April 2023,
+ending over six decades of commercial nuclear power in Germany.
+([BASE — Federal Office for the Safety of Nuclear Waste Management](https://www.base.bund.de/en/nuclear-safety/nuclear-phase-out/nuclear-phase-out_content.html))
+
+In the context of this analysis, the nuclear shutdown is analytically
+significant: it removed approximately 4 GW of baseload capacity from the
+DE-LU merit order, increasing the residual load that must be met by
+dispatchable thermal and imported power — and thereby amplifying the
+price sensitivity to renewable variability that Stage 2 aims to quantify.
+:::
+
+
+## 4.0 Alignment & readiness {#sec-alignment}
+
+All three sources share a common UTC hourly index across 2020–2025. The table
+below summarises alignment status:
+
+| Check | Status |
+|-------|--------|
+| Common temporal resolution | ✓ Hourly (SMARD aggregated from 15 min) |
+| Common timezone | ✓ All stored as UTC |
+| Date range overlap | ✓ 2020-01-01 through 2025 (varies by source) |
+| Missing data | ✓ None in SMARD or ERA5; documented gaps in ENTSO-E flows (see @sec-flows) |
+| Join key | `datetime_utc` across all tables |
+
+The data are ready for Stage 1 (Weather → Generation modelling) without
+further cleaning. The cross-border flow gaps are the only irregularity and
+are handled by construction in the net-export feature (Stage 2).
