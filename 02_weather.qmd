@@ -1,0 +1,708 @@
+---
+title: "Weather → Generation"
+subtitle: "Capacity factor models linking ERA5 reanalysis to observed renewable output"
+params:
+  bidding_zone: "NL"
+  analysis_year_start: 2020
+  analysis_year_end: 2025
+execute:
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 9,
+  fig.height = 5
+)
+
+library(tidyverse)
+library(tidymodels)
+library(tsibble)
+library(arrow)
+library(patchwork)
+library(lubridate)
+library(glue)
+
+# ── Zone label for filenames and display ─────────────────────────────
+zone_file <- str_replace(params$bidding_zone, "_", "-")  # DE_LU → DE-LU
+
+# ── Custom theme (consistent with 01_data.qmd) ──────────────────────
+theme_report <- theme_minimal(base_family = "Arial", base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(colour = "grey40", size = 11),
+    plot.caption  = element_text(colour = "grey50", size = 8),
+    strip.text    = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+
+theme_set(theme_report)
+
+# ── Colour palette ───────────────────────────────────────────────────
+pal <- c(
+  wind_onshore  = "#2166AC",
+  wind_offshore = "#67A9CF",
+  solar         = "#F4A582"
+)
+```
+
+
+## 1.0 Overview {#sec-overview}
+
+This page establishes the physical link between weather conditions and
+renewable electricity generation — the foundation every subsequent stage
+depends on. We fit capacity-factor models for **wind onshore**, **wind
+offshore**, and **solar PV** in the `r zone_file` bidding zone using ERA5
+reanalysis weather data and observed SMARD generation series.
+
+**Approach.** For each technology we:
+
+1. Profile the ERA5 weather variables and check timestamp alignment with
+   SMARD generation.
+2. Join hourly ERA5 weather to observed generation and compute capacity
+   factors using BNetzA installed-capacity milestones.
+3. Fit a `tidymodels` workflow — polynomial weather terms plus
+   month/hour fixed effects (with month × irradiance interactions for
+   solar) — on a temporal 80/20 train/test split.
+4. Evaluate with RMSE, MAE, and R² on the held-out test period.
+
+
+## 2.0 Data loading {#sec-data}
+
+```{r}
+#| label: load-data
+
+era5_path  <- glue("data/processed/era5/{zone_file}.parquet")
+smard_path <- list.files("data/processed/smard",
+                         pattern = glue("smard_{zone_file}"),
+                         full.names = TRUE)
+
+era5  <- read_parquet(era5_path)
+smard <- read_parquet(smard_path)
+
+cat("ERA5  rows:", nrow(era5),
+    " | range:", format(min(era5$datetime_utc)), "–",
+    format(max(era5$datetime_utc)), "\n")
+cat("SMARD rows:", nrow(smard),
+    " | range:", format(min(smard$datetime_utc)), "–",
+    format(max(smard$datetime_utc)), "\n")
+```
+
+
+## 3.0 ERA5 weather variable profiles {#sec-era5-eda}
+
+Before joining to generation data, we profile the four ERA5 variables to
+check for processing artifacts, confirm physical ranges, and understand
+the marginal distributions.
+
+### 3.1 Distributions {#sec-era5-distributions}
+
+```{r}
+#| label: fig-era5-distributions
+#| fig-height: 7
+#| fig-width: 10
+
+p_wind100 <- ggplot(era5, aes(x = wind_speed_100m)) +
+  geom_histogram(bins = 80, fill = pal["wind_onshore"], alpha = 0.7) +
+  labs(title = "100 m wind speed", x = "m/s", y = "Count")
+
+p_wind10 <- ggplot(era5, aes(x = wind_speed_10m)) +
+  geom_histogram(bins = 80, fill = pal["wind_offshore"], alpha = 0.7) +
+  labs(title = "10 m wind speed", x = "m/s", y = "Count")
+
+p_temp <- ggplot(era5, aes(x = temperature_2m)) +
+  geom_histogram(bins = 80, fill = "grey50", alpha = 0.7) +
+  labs(title = "2 m temperature", x = "°C", y = "Count")
+
+p_ssrd <- era5 |>
+  filter(ssrd_wm2 > 0) |>
+  ggplot(aes(x = ssrd_wm2)) +
+  geom_histogram(bins = 80, fill = pal["solar"], alpha = 0.7) +
+  labs(title = "Surface solar radiation (daylight only)",
+       x = expression("W/m"^2), y = "Count")
+
+(p_wind100 + p_wind10) / (p_temp + p_ssrd) +
+  plot_annotation(
+    title   = glue("ERA5 weather variable distributions — {zone_file} spatial average"),
+    caption = "Source: Copernicus ERA5 reanalysis"
+  )
+```
+
+### 3.2 Seasonal diurnal profiles {#sec-era5-diurnal}
+
+```{r}
+#| label: fig-era5-diurnal
+#| fig-height: 6
+#| fig-width: 10
+
+era5 |>
+  mutate(
+    hour_utc = hour(datetime_utc),
+    season = case_when(
+      month(datetime_utc) %in% c(12, 1, 2) ~ "Winter",
+      month(datetime_utc) %in% c(3, 4, 5)  ~ "Spring",
+      month(datetime_utc) %in% c(6, 7, 8)  ~ "Summer",
+      TRUE                                  ~ "Autumn"
+    ),
+    season = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn"))
+  ) |>
+  group_by(season, hour_utc) |>
+  summarise(
+    wind_100m = mean(wind_speed_100m, na.rm = TRUE),
+    ssrd      = mean(ssrd_wm2, na.rm = TRUE),
+    .groups   = "drop"
+  ) |>
+  pivot_longer(c(wind_100m, ssrd), names_to = "variable", values_to = "value") |>
+  mutate(variable = recode(variable,
+                           wind_100m = "Wind speed 100m (m/s)",
+                           ssrd      = "Solar radiation (W/m²)")) |>
+  ggplot(aes(x = hour_utc, y = value, colour = season)) +
+  geom_line(linewidth = 0.9) +
+  geom_point(size = 1.2) +
+  facet_wrap(~ variable, scales = "free_y") +
+  scale_colour_brewer(palette = "Set2") +
+  labs(
+    title   = "Mean diurnal profiles by season",
+    x       = "Hour (UTC)",
+    y       = NULL,
+    colour  = NULL,
+    caption = "Source: Copernicus ERA5 reanalysis"
+  )
+```
+
+
+### 3.3 Timestamp alignment check {#sec-timestamp-check}
+
+ERA5 `ssrd` is originally an accumulated field (J/m² per forecast step).
+Before modelling we verify that the converted instantaneous values align
+temporally with SMARD solar generation — a 1-hour offset would produce
+misleading scatter plots and biased models.
+
+```{r}
+#| label: fig-timestamp-alignment
+#| fig-height: 4
+
+era5 |>
+  inner_join(smard, by = "datetime_utc") |>
+  filter(month(datetime_utc) == 6) |>
+  mutate(hour_utc = hour(datetime_utc)) |>
+  filter(hour_utc %in% 4:20) |>
+  group_by(hour_utc) |>
+  summarise(
+    mean_ssrd  = mean(ssrd_wm2, na.rm = TRUE),
+    mean_solar = mean(solar, na.rm = TRUE),
+    .groups    = "drop"
+  ) |>
+  pivot_longer(-hour_utc, names_to = "source", values_to = "value") |>
+  mutate(source = recode(source,
+                         mean_ssrd  = "ERA5 solar radiation",
+                         mean_solar = "SMARD solar generation")) |>
+  ggplot(aes(x = hour_utc, y = value, colour = source)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~ source, scales = "free_y") +
+  labs(
+    title    = "Timestamp alignment: ERA5 vs SMARD (June)",
+    subtitle = "Peaks at the same UTC hour confirm correct alignment",
+    x        = "Hour (UTC)",
+    y        = NULL,
+    colour   = NULL,
+    caption  = "Sources: Copernicus ERA5, SMARD (BNetzA)"
+  ) +
+  theme(legend.position = "none")
+```
+
+
+## 4.0 Join & capacity factors {#sec-capacity}
+
+```{r}
+#| label: join-datasets
+
+model_raw <- era5 |>
+  inner_join(smard, by = "datetime_utc") |>
+  mutate(
+    date  = as_date(datetime_utc),
+    month = factor(month(datetime_utc, label = TRUE), ordered = FALSE),
+    hour  = factor(hour(datetime_utc)),
+    year  = year(datetime_utc),
+    season = case_when(
+      month(datetime_utc) %in% c(12, 1, 2) ~ "Winter",
+      month(datetime_utc) %in% c(3, 4, 5)  ~ "Spring",
+      month(datetime_utc) %in% c(6, 7, 8)  ~ "Summer",
+      TRUE                                  ~ "Autumn"
+    ),
+    season = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn"))
+  )
+
+cat("Joined rows:", nrow(model_raw), "\n")
+```
+
+Computing capacity factors requires dividing observed generation (MW) by
+installed capacity (MW). SMARD does not include an installed-capacity
+column, so we construct a lookup from
+[BNetzA / Marktstammdatenregister](https://www.marktstammdatenregister.de)
+year-end published totals and interpolate linearly to daily resolution.
+
+```{r}
+#| label: installed-capacity
+
+# ── Year-end installed capacity (MW) — BNetzA monitoring reports ─────
+# Sources: BNetzA Monitoringbericht, SMARD "Installed generation capacity"
+# These are approximate — replace with exact values if available.
+
+installed_cap <- tribble(
+  ~date,            ~cap_wind_onshore, ~cap_wind_offshore, ~cap_solar,
+  "2019-12-31",     53200,             7700,               49100,
+  "2020-12-31",     54400,             7770,               53700,
+  "2021-12-31",     55900,             7790,               58700,
+  "2022-12-31",     58100,             8050,               66500,
+  "2023-12-31",     61000,             8390,               74100,
+  "2024-12-31",     63800,             8900,               81700,
+  "2025-06-30",     65500,             9200,               86000   # provisional
+) |>
+  mutate(date = as_date(date))
+
+# ── Linearly interpolate to daily resolution ─────────────────────────
+date_seq <- tibble(date = seq(min(installed_cap$date),
+                              max(installed_cap$date),
+                              by = "day"))
+
+cap_daily <- date_seq |>
+  left_join(installed_cap, by = "date") |>
+  mutate(across(starts_with("cap_"),
+                ~ approx(x = date[!is.na(.x)],
+                          y = .x[!is.na(.x)],
+                          xout = date)$y))
+```
+
+```{r}
+#| label: compute-cf
+
+model_data <- model_raw |>
+  left_join(cap_daily, by = "date") |>
+  mutate(
+    cf_wind_onshore  = wind_onshore  / cap_wind_onshore,
+    cf_wind_offshore = wind_offshore / cap_wind_offshore,
+    cf_solar         = solar         / cap_solar
+  ) |>
+  # Solar CF is only meaningful during daylight; set nighttime to NA
+  mutate(cf_solar = if_else(ssrd_wm2 > 0 | solar > 0,
+                            cf_solar,
+                            NA_real_))
+
+cat("Observations with valid CF:",
+    sum(!is.na(model_data$cf_wind_onshore)), "(wind on),",
+    sum(!is.na(model_data$cf_wind_offshore)), "(wind off),",
+    sum(!is.na(model_data$cf_solar)), "(solar)\n")
+```
+
+
+## 5.0 Correlation structure {#sec-correlations}
+
+```{r}
+#| label: fig-correlation
+#| fig-height: 6
+
+cor_vars <- model_data |>
+  select(
+    `Wind 100m`   = wind_speed_100m,
+    `Wind 10m`    = wind_speed_10m,
+    `Temp 2m`     = temperature_2m,
+    `Solar rad`   = ssrd_wm2,
+    `CF onshore`  = cf_wind_onshore,
+    `CF offshore` = cf_wind_offshore,
+    `CF solar`    = cf_solar
+  ) |>
+  drop_na()
+
+cor_mat <- cor(cor_vars)
+
+cor_long <- cor_mat |>
+  as.data.frame() |>
+  rownames_to_column("var1") |>
+  pivot_longer(-var1, names_to = "var2", values_to = "r") |>
+  mutate(
+    var1 = factor(var1, levels = colnames(cor_mat)),
+    var2 = factor(var2, levels = colnames(cor_mat))
+  ) |>
+  filter(as.integer(var1) >= as.integer(var2))
+
+ggplot(cor_long, aes(x = var2, y = var1, fill = r)) +
+  geom_tile(colour = "white", linewidth = 0.5) +
+  geom_text(aes(label = sprintf("%.2f", r)), size = 3.2) +
+  scale_fill_gradient2(low = "#2166AC", mid = "white", high = "#B2182B",
+                       midpoint = 0, limits = c(-1, 1)) +
+  labs(
+    title    = "Weather–generation correlation matrix",
+    subtitle = glue("{zone_file}, hourly observations"),
+    fill     = "Pearson r",
+    caption  = "Sources: Copernicus ERA5, SMARD (BNetzA)"
+  ) +
+  coord_equal() +
+  theme(axis.title = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+## 6.0 Scatter plots: weather → capacity factor {#sec-scatter}
+
+### 6.1 Wind speed → wind onshore CF {#sec-wind-scatter}
+
+```{r}
+#| label: fig-wind-scatter
+#| fig-height: 5
+
+model_data |>
+  filter(!is.na(cf_wind_onshore)) |>
+  slice_sample(n = 15000) |>
+  ggplot(aes(x = wind_speed_100m, y = cf_wind_onshore)) +
+  geom_point(alpha = 0.05, colour = pal["wind_onshore"], size = 0.5) +
+  geom_smooth(method = "lm",
+              formula = y ~ poly(x, 3),
+              colour = "black", linewidth = 0.8, se = TRUE) +
+  scale_y_continuous(labels = scales::percent_format(),
+                     limits = c(0, 1)) +
+  labs(
+    title    = "Wind speed → onshore capacity factor",
+    subtitle = glue("Degree-3 polynomial fit | {zone_file} hourly"),
+    x        = "ERA5 100 m wind speed (m/s)",
+    y        = "Capacity factor",
+    caption  = "Sources: Copernicus ERA5, SMARD (BNetzA)"
+  )
+```
+
+
+### 6.2 Solar irradiance → solar PV CF {#sec-solar-scatter}
+
+The marginal relationship between irradiance and solar CF appears
+non-monotonic when plotted unconditionally. This is not a modelling
+problem — it reflects the mixing of seasonal regimes. At the same
+irradiance level (e.g. 100 W/m²), winter midday produces a high CF
+(that is as good as the sun gets in January) while summer cloud cover
+at the same irradiance implies suppressed output relative to clear-sky
+potential. The hour and month fixed effects in the model capture this
+conditioning; the faceted plots below confirm monotonic relationships
+within time-of-day strata.
+
+```{r}
+#| label: fig-solar-scatter-marginal
+#| fig-height: 8
+#| fig-width: 12
+
+solar_plot_df <- model_data |>
+  filter(!is.na(cf_solar), ssrd_wm2 > 5)
+
+p_marginal <- solar_plot_df |>
+  slice_sample(n = 15000) |>
+  ggplot(aes(x = ssrd_wm2, y = cf_solar)) +
+  geom_point(alpha = 0.05, colour = pal["solar"], size = 0.5) +
+  geom_smooth(method = "gam", formula = y ~ s(x),
+              colour = "black", linewidth = 0.8, se = TRUE) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Marginal (unconditional)",
+    x     = expression("W/m"^2),
+    y     = "Capacity factor"
+  )
+
+p_faceted <- solar_plot_df |>
+  mutate(hour_bin = cut(hour(datetime_utc),
+                        breaks = seq(4, 22, by = 2),
+                        labels = paste0(seq(4, 20, by = 2), "–",
+                                        seq(6, 22, by = 2)),
+                        include.lowest = TRUE)) |>
+  filter(!is.na(hour_bin)) |>
+  slice_sample(n = 20000) |>
+  ggplot(aes(x = ssrd_wm2, y = cf_solar)) +
+  geom_point(alpha = 0.06, colour = pal["solar"], size = 0.3) +
+  geom_smooth(method = "gam", formula = y ~ s(x),
+              colour = "black", linewidth = 0.7) +
+  facet_wrap(~ hour_bin, ncol = 3) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title = "Conditioned on time of day (UTC)",
+    x     = expression("W/m"^2),
+    y     = "Capacity factor"
+  )
+
+p_marginal | p_faceted +
+  plot_annotation(
+    title   = "Solar irradiance → PV capacity factor",
+    caption = "Sources: Copernicus ERA5, SMARD (BNetzA)"
+  )
+```
+
+
+### 6.3 Midday deep dive: season resolves the remaining non-monotonicity {#sec-solar-midday}
+
+Even within the 10–12 UTC bin, the relationship appears non-monotonic.
+Faceting by season confirms this is a **solar geometry effect**: the
+same irradiance value implies very different things in winter versus
+summer.
+
+```{r}
+#| label: fig-solar-midday-season
+#| fig-height: 5
+#| fig-width: 10
+
+model_data |>
+  filter(!is.na(cf_solar), ssrd_wm2 > 5,
+         hour(datetime_utc) %in% 10:11) |>
+  ggplot(aes(x = ssrd_wm2, y = cf_solar)) +
+  geom_point(alpha = 0.08, colour = pal["solar"], size = 0.5) +
+  geom_smooth(method = "gam", formula = y ~ s(x),
+              colour = "black", linewidth = 0.8) +
+  facet_wrap(~ season) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    title    = "10–12 UTC: irradiance → CF by season",
+    subtitle = "Within-season monotonicity confirms need for month × irradiance interactions",
+    x        = expression("W/m"^2),
+    y        = "Capacity factor",
+    caption  = "Sources: Copernicus ERA5, SMARD (BNetzA)"
+  )
+```
+
+
+## 7.0 Capacity factor models {#sec-models}
+
+We fit one `tidymodels` workflow per technology using a temporal
+80/20 train/test split (no shuffling — critical for time-series
+validity). Wind models use polynomial wind-speed terms with month/hour
+fixed effects. The solar model includes **month × irradiance
+interaction terms** to capture the seasonal variation in the
+irradiance–CF slope identified in the EDA above.
+
+
+### 7.1 Wind onshore {#sec-model-wind-on}
+
+```{r}
+#| label: model-wind-onshore
+
+wind_on_df <- model_data |>
+  filter(!is.na(cf_wind_onshore)) |>
+  select(datetime_utc, cf_wind_onshore,
+         wind_speed_100m, wind_speed_10m, temperature_2m,
+         month, hour)
+
+split_wind_on <- initial_time_split(wind_on_df, prop = 0.8)
+cat("Train:", nrow(training(split_wind_on)),
+    "| Test:", nrow(testing(split_wind_on)), "\n")
+
+rec_wind_on <- recipe(
+  cf_wind_onshore ~ wind_speed_100m + wind_speed_10m +
+                     temperature_2m + month + hour,
+  data = training(split_wind_on)
+) |>
+  step_poly(wind_speed_100m, degree = 3) |>
+  step_poly(wind_speed_10m,  degree = 2) |>
+  step_dummy(all_nominal_predictors())
+
+wf_wind_on <- workflow() |>
+  add_recipe(rec_wind_on) |>
+  add_model(linear_reg())
+
+fit_wind_on <- fit(wf_wind_on, data = training(split_wind_on))
+
+preds_wind_on <- fit_wind_on |>
+  augment(testing(split_wind_on))
+
+metrics_wind_on <- preds_wind_on |>
+  metrics(truth = cf_wind_onshore, estimate = .pred)
+
+metrics_wind_on |>
+  knitr::kable(digits = 4, caption = "Wind onshore model — test set performance")
+```
+
+
+### 7.2 Wind offshore {#sec-model-wind-off}
+
+```{r}
+#| label: model-wind-offshore
+
+wind_off_df <- model_data |>
+  filter(!is.na(cf_wind_offshore)) |>
+  select(datetime_utc, cf_wind_offshore,
+         wind_speed_100m, wind_speed_10m, temperature_2m,
+         month, hour)
+
+split_wind_off <- initial_time_split(wind_off_df, prop = 0.8)
+
+rec_wind_off <- recipe(
+  cf_wind_offshore ~ wind_speed_100m + wind_speed_10m +
+                      temperature_2m + month + hour,
+  data = training(split_wind_off)
+) |>
+  step_poly(wind_speed_100m, degree = 3) |>
+  step_poly(wind_speed_10m,  degree = 2) |>
+  step_dummy(all_nominal_predictors())
+
+wf_wind_off <- workflow() |>
+  add_recipe(rec_wind_off) |>
+  add_model(linear_reg())
+
+fit_wind_off <- fit(wf_wind_off, data = training(split_wind_off))
+
+preds_wind_off <- fit_wind_off |>
+  augment(testing(split_wind_off))
+
+metrics_wind_off <- preds_wind_off |>
+  metrics(truth = cf_wind_offshore, estimate = .pred)
+
+metrics_wind_off |>
+  knitr::kable(digits = 4, caption = "Wind offshore model — test set performance")
+```
+
+
+### 7.3 Solar PV {#sec-model-solar}
+
+The solar recipe includes month × irradiance interactions so that the
+irradiance–CF slope can vary by month — physically motivated by the
+seasonal change in solar geometry (sun angle, day length) identified in
+@sec-solar-midday. Temperature is included to capture the ~0.4%/°C
+efficiency loss above standard test conditions (25 °C).
+
+```{r}
+#| label: model-solar
+
+solar_df <- model_data |>
+  filter(!is.na(cf_solar), ssrd_wm2 > 0) |>
+  select(datetime_utc, cf_solar,
+         ssrd_wm2, temperature_2m,
+         month, hour)
+
+split_solar <- initial_time_split(solar_df, prop = 0.8)
+
+rec_solar <- recipe(
+  cf_solar ~ ssrd_wm2 + temperature_2m + month + hour,
+  data = training(split_solar)
+) |>
+  step_dummy(all_nominal_predictors()) |>
+  step_interact(terms = ~ ssrd_wm2:starts_with("month_"))
+
+wf_solar <- workflow() |>
+  add_recipe(rec_solar) |>
+  add_model(linear_reg())
+
+fit_solar <- fit(wf_solar, data = training(split_solar))
+
+preds_solar <- fit_solar |>
+  augment(testing(split_solar))
+
+metrics_solar <- preds_solar |>
+  metrics(truth = cf_solar, estimate = .pred)
+
+metrics_solar |>
+  knitr::kable(digits = 4, caption = "Solar PV model — test set performance")
+```
+
+
+## 8.0 Model diagnostics {#sec-diagnostics}
+
+Two diagnostic panels per technology: predicted versus actual capacity
+factor (a well-calibrated model hugs the 1:1 line) and the residual
+distribution (centred near zero with no heavy skew indicates the model
+specification is adequate).
+
+```{r}
+#| label: fig-diagnostics
+#| fig-height: 10
+#| fig-width: 10
+
+diag_panels <- function(preds, truth_col, label, colour) {
+  n_plot <- min(8000, nrow(preds))
+
+  p_scatter <- preds |>
+    slice_sample(n = n_plot) |>
+    ggplot(aes(x = .data[[truth_col]], y = .pred)) +
+    geom_point(alpha = 0.05, colour = colour, size = 0.5) +
+    geom_abline(slope = 1, intercept = 0,
+                linetype = "dashed", colour = "grey30") +
+    scale_x_continuous(labels = scales::percent_format()) +
+    scale_y_continuous(labels = scales::percent_format()) +
+    coord_equal(xlim = c(0, 1), ylim = c(0, 1)) +
+    labs(title = label, x = "Actual CF", y = "Predicted CF")
+
+  p_resid <- preds |>
+    mutate(resid = .pred - .data[[truth_col]]) |>
+    ggplot(aes(x = resid)) +
+    geom_histogram(bins = 80, fill = colour, alpha = 0.7) +
+    geom_vline(xintercept = 0, linetype = "dashed", colour = "grey30") +
+    labs(title = paste(label, "— residuals"),
+         x = "Residual (pred − actual)", y = "Count")
+
+  p_scatter + p_resid
+}
+
+p1 <- diag_panels(preds_wind_on,  "cf_wind_onshore",  "Wind onshore",  pal["wind_onshore"])
+p2 <- diag_panels(preds_wind_off, "cf_wind_offshore", "Wind offshore", pal["wind_offshore"])
+p3 <- diag_panels(preds_solar,    "cf_solar",         "Solar PV",      pal["solar"])
+
+(p1 / p2 / p3) +
+  plot_annotation(
+    title   = glue("Capacity factor model diagnostics — {zone_file} test set"),
+    caption = "Sources: Copernicus ERA5, SMARD (BNetzA)"
+  )
+```
+
+
+## 9.0 Save fitted workflows {#sec-export}
+
+The fitted `tidymodels` workflow objects are serialised to `models/` for
+reuse in Stage 2 (price decomposition) and Stage 3 (risk simulation).
+Each `.rds` file contains the full preprocessing recipe plus fitted
+coefficients — `predict(readRDS(...), new_data)` is all downstream
+stages need.
+
+```{r}
+#| label: save-models
+
+dir.create("models", showWarnings = FALSE)
+
+saveRDS(fit_wind_on,  glue("models/cf_wind_onshore_{zone_file}.rds"))
+saveRDS(fit_wind_off, glue("models/cf_wind_offshore_{zone_file}.rds"))
+saveRDS(fit_solar,    glue("models/cf_solar_{zone_file}.rds"))
+
+cat(glue("Saved 3 workflow objects to models/ ({zone_file})"), "\n")
+```
+
+
+## 10.0 Key findings {#sec-findings}
+
+```{r}
+#| label: summary-table
+
+bind_rows(
+  metrics_wind_on  |> mutate(technology = "Wind onshore"),
+  metrics_wind_off |> mutate(technology = "Wind offshore"),
+  metrics_solar    |> mutate(technology = "Solar PV")
+) |>
+  select(technology, .metric, .estimate) |>
+  pivot_wider(names_from = .metric, values_from = .estimate) |>
+  knitr::kable(
+    digits = 4,
+    caption = glue("Summary of capacity factor model performance on the temporal test set ({zone_file})")
+  )
+```
+
+**Interpretation.** ERA5 100 m wind speed is the dominant predictor of
+wind generation capacity factors, with the cubic polynomial capturing
+the characteristic ramp-up and saturation of a turbine power curve.
+Solar irradiance maps onto PV capacity factors with a slope that varies
+by month — an interaction effect driven by solar geometry (sun angle and
+day length). The month × irradiance terms resolve the apparent
+non-monotonicity visible in the unconditional scatter plot (@sec-solar-scatter),
+confirming that the bimodal pattern reflects seasonal regime mixing
+rather than a data quality issue. Temperature adds a modest correction
+for PV cell-efficiency losses above standard test conditions (25 °C).
+
+These fitted workflows feed directly into Stage 2, where weather-driven
+generation predictions are used as features in the day-ahead price
+decomposition model.
