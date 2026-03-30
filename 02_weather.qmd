@@ -1,8 +1,7 @@
 ---
 title: "Weather → Generation"
-subtitle: "Capacity factor models linking ERA5 reanalysis to observed renewable output"
+subtitle: "Cross-zone weather profiles and DE-LU capacity factor models"
 params:
-  bidding_zone: "NL"
   analysis_year_start: 2020
   analysis_year_end: 2025
 execute:
@@ -30,8 +29,8 @@ library(patchwork)
 library(lubridate)
 library(glue)
 
-# ── Zone label for filenames and display ─────────────────────────────
-zone_file <- str_replace(params$bidding_zone, "_", "-")  # DE_LU → DE-LU
+# ── DE-LU is the modelling zone ─────────────────────────────────────
+zone_file <- "DE-LU"
 
 # ── Custom theme (consistent with 01_data.qmd) ──────────────────────
 theme_report <- theme_minimal(base_family = "Arial", base_size = 12) +
@@ -56,22 +55,26 @@ pal <- c(
 
 ## 1.0 Overview {#sec-overview}
 
-This page establishes the physical link between weather conditions and
-renewable electricity generation — the foundation every subsequent stage
-depends on. We fit capacity-factor models for **wind onshore**, **wind
-offshore**, and **solar PV** in the `r zone_file` bidding zone using ERA5
-reanalysis weather data and observed SMARD generation series.
+This page has two parts. First, we compare **ERA5 reanalysis weather
+profiles across all available bidding zones** — wind speed distributions,
+solar irradiance gradients, and seasonal patterns — to build intuition
+for why renewable generation (and its price impact) differs across
+Central Western Europe and the Nordics.
 
-**Approach.** For each technology we:
+Second, we **fit capacity-factor models for DE-LU**, where SMARD
+provides the most granular generation breakdown by technology. These
+models link ERA5 weather variables to observed wind onshore, wind
+offshore, and solar PV output, and feed directly into the price
+decomposition (Stage 2) and risk simulation (Stage 3).
 
-1. Profile the ERA5 weather variables and check timestamp alignment with
-   SMARD generation.
-2. Join hourly ERA5 weather to observed generation and compute capacity
-   factors using BNetzA installed-capacity milestones.
-3. Fit a `tidymodels` workflow — polynomial weather terms plus
+**Modelling approach.** For each technology we:
+
+1. Join hourly ERA5 weather to observed SMARD generation and compute
+   capacity factors using BNetzA installed-capacity milestones.
+2. Fit a `tidymodels` workflow — polynomial weather terms plus
    month/hour fixed effects (with month × irradiance interactions for
    solar) — on a temporal 80/20 train/test split.
-4. Evaluate with RMSE, MAE, and R² on the held-out test period.
+3. Evaluate with RMSE, MAE, and R² on the held-out test period.
 
 
 ## 2.0 Data loading {#sec-data}
@@ -79,66 +82,281 @@ reanalysis weather data and observed SMARD generation series.
 ```{r}
 #| label: load-data
 
-era5_path  <- glue("data/processed/era5/{zone_file}.parquet")
+# ── Load all available ERA5 zone parquets ────────────────────────────
+era5_files <- list.files("data/processed/era5",
+                         pattern = "\\.parquet$",
+                         full.names = TRUE)
+
+era5_all <- map(era5_files, \(f) {
+  read_parquet(f) |>
+    mutate(zone = str_remove(basename(f), "\\.parquet$"))
+}) |>
+  list_rbind()
+
+zones_available <- sort(unique(era5_all$zone))
+cat("ERA5 zones loaded:", paste(zones_available, collapse = ", "), "\n")
+cat("Total ERA5 rows:", nrow(era5_all), "\n")
+
+# ── Load DE-LU ERA5 and SMARD separately for modelling ──────────────
+era5 <- era5_all |> filter(zone == zone_file) |> select(-zone)
+
 smard_path <- list.files("data/processed/smard",
                          pattern = glue("smard_{zone_file}"),
                          full.names = TRUE)
-
-era5  <- read_parquet(era5_path)
 smard <- read_parquet(smard_path)
 
-cat("ERA5  rows:", nrow(era5),
+cat("\nDE-LU ERA5 rows:", nrow(era5),
     " | range:", format(min(era5$datetime_utc)), "–",
     format(max(era5$datetime_utc)), "\n")
-cat("SMARD rows:", nrow(smard),
+cat("DE-LU SMARD rows:", nrow(smard),
     " | range:", format(min(smard$datetime_utc)), "–",
     format(max(smard$datetime_utc)), "\n")
 ```
 
 
-## 3.0 ERA5 weather variable profiles {#sec-era5-eda}
+## 3.0 Cross-zone weather profiles {#sec-cross-zone}
 
-Before joining to generation data, we profile the four ERA5 variables to
-check for processing artifacts, confirm physical ranges, and understand
-the marginal distributions.
+Before narrowing to DE-LU for capacity-factor modelling, we compare the
+weather resource across all zones for which ERA5 spatial averages are
+available. These profiles explain much of the cross-zone variation in
+renewable generation — and ultimately in price dynamics — explored in
+Stage 2.
 
-### 3.1 Distributions {#sec-era5-distributions}
+
+### 3.1 Wind speed distributions {#sec-cross-zone-wind}
+
+Hub-height (100 m) wind speed distributions differ markedly across
+bidding zones, reflecting geographic exposure to Atlantic weather
+systems, coastal effects, and orography. Zones with higher mean wind
+speeds and heavier right tails support higher average capacity factors
+but also contribute more generation variability.
 
 ```{r}
-#| label: fig-era5-distributions
+library(plotly)
+
+wind_density <- era5_all |>
+  group_by(zone) |>
+  group_map(\(df, grp) {
+    d <- density(df$wind_speed_100m, from = 0, n = 256)
+    tibble(zone = grp$zone, wind_speed = d$x, density = d$y)
+  }) |>
+  list_rbind()
+
+plot_ly(wind_density, x = ~wind_speed, y = ~density,
+        color = ~zone, type = "scatter", mode = "lines",
+        fill = "tozeroy", opacity = 0.35,
+        hovertemplate = paste0(
+          "<b>%{meta}</b><br>",
+          "Wind speed: %{x:.1f} m/s<br>",
+          "Density: %{y:.4f}<extra></extra>"
+        ),
+        meta = ~zone) |>
+  layout(
+    title = list(
+      text = "100m wind speed distributions by bidding zone",
+      font = list(size = 14)
+    ),
+    xaxis = list(title = "Wind speed (m/s)"),
+    yaxis = list(title = "Density"),
+    legend = list(title = list(text = "Zone")),
+    annotations = list(
+      list(text = "Source: Copernicus ERA5 reanalysis",
+           xref = "paper", yref = "paper", x = 1, y = -0.12,
+           showarrow = FALSE, font = list(size = 8, color = "grey50"),
+           xanchor = "right")
+    )
+  )
+```
+
+
+
+### 3.2 Seasonal wind profiles {#sec-cross-zone-seasonal-wind}
+
+Wind resource shows strong seasonality across all zones — winter months
+are consistently windier — but the magnitude of the seasonal swing
+varies geographically. Zones with a large winter-to-summer ratio face
+more pronounced seasonal generation risk.
+
+```{r}
+#| label: fig-cross-zone-seasonal-wind
+#| fig-height: 6
+#| fig-width: 10
+
+era5_all |>
+  mutate(
+    season = case_when(
+      month(datetime_utc) %in% c(12, 1, 2) ~ "Winter",
+      month(datetime_utc) %in% c(3, 4, 5)  ~ "Spring",
+      month(datetime_utc) %in% c(6, 7, 8)  ~ "Summer",
+      TRUE                                  ~ "Autumn"
+    ),
+    season = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn"))
+  ) |>
+  group_by(zone, season) |>
+  summarise(
+    mean_wind = mean(wind_speed_100m, na.rm = TRUE),
+    .groups   = "drop"
+  ) |>
+  mutate(zone = fct_reorder(zone, mean_wind, .fun = mean, .desc = TRUE)) |>
+  ggplot(aes(x = zone, y = mean_wind, fill = season)) +
+  geom_col(position = "dodge", alpha = 0.85) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title    = "Mean 100 m wind speed by zone and season",
+    subtitle = "Winter dominance is universal but the seasonal swing varies by zone",
+    x        = NULL,
+    y        = "Mean wind speed (m/s)",
+    fill     = NULL,
+    caption  = "Source: Copernicus ERA5 reanalysis"
+  )
+```
+
+
+### 3.3 Solar irradiance gradient {#sec-cross-zone-solar}
+
+Surface solar irradiance falls with latitude — southern zones receive
+materially more annual radiation than Nordic zones. This gradient drives
+differences in solar PV economics and in the relative contribution of
+solar variability to price risk across the interconnected market.
+
+
+```{r}
+library(plotly)
+
+solar_diurnal <- era5_all |>
+  mutate(
+    hour_utc = hour(datetime_utc),
+    season = case_when(
+      month(datetime_utc) %in% c(12, 1, 2) ~ "Winter",
+      month(datetime_utc) %in% c(3, 4, 5)  ~ "Spring",
+      month(datetime_utc) %in% c(6, 7, 8)  ~ "Summer",
+      TRUE                                  ~ "Autumn"
+    ),
+    season = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn"))
+  ) |>
+  group_by(zone, season, hour_utc) |>
+  summarise(mean_ssrd = round(mean(ssrd_wm2, na.rm = TRUE), 1),
+            .groups = "drop")
+
+make_panel <- function(df, season_label, show_legend = FALSE) {
+  plot_ly(df |> filter(season == season_label),
+          x = ~hour_utc, y = ~mean_ssrd, color = ~zone,
+          type = "scatter", mode = "lines",
+          showlegend = show_legend,
+          hovertemplate = paste0(
+            "<b>%{meta}</b><br>",
+            "Hour: %{x} UTC<br>",
+            "Irradiance: %{y:.1f} W/m²<extra></extra>"
+          ),
+          meta = ~zone) |>
+    layout(
+      xaxis = list(title = if (season_label %in% c("Summer", "Autumn"))
+                             "Hour (UTC)" else ""),
+      yaxis = list(title = if (season_label %in% c("Winter", "Summer"))
+                             "W/m²" else ""),
+      annotations = list(
+        list(text = paste0("<b>", season_label, "</b>"),
+             xref = "paper", yref = "paper",
+             x = 0.5, y = 1.05, showarrow = FALSE,
+             font = list(size = 12))
+      )
+    )
+}
+
+subplot(
+  make_panel(solar_diurnal, "Winter"),
+  make_panel(solar_diurnal, "Spring", show_legend = TRUE),
+  make_panel(solar_diurnal, "Summer"),
+  make_panel(solar_diurnal, "Autumn"),
+  nrows = 2, shareX = TRUE, shareY = TRUE,
+  titleX = TRUE, titleY = TRUE
+) |>
+  layout(
+    title = list(
+      text = "Mean diurnal solar irradiance by zone and season",
+      font = list(size = 14)
+    ),
+    legend = list(title = list(text = "Zone")),
+    annotations = list(
+      list(text = "Source: Copernicus ERA5 reanalysis",
+           xref = "paper", yref = "paper", x = 1, y = -0.08,
+           showarrow = FALSE, font = list(size = 8, color = "grey50"),
+           xanchor = "right")
+    )
+  )
+```
+
+
+
+### 3.4 Cross-zone summary statistics {#sec-cross-zone-summary}
+
+```{r}
+#| label: tbl-cross-zone-summary
+
+era5_all |>
+  group_by(zone) |>
+  summarise(
+    `Wind 100m mean (m/s)` = round(mean(wind_speed_100m, na.rm = TRUE), 2),
+    `Wind 100m sd (m/s)`   = round(sd(wind_speed_100m, na.rm = TRUE), 2),
+    `Solar mean (W/m²)`    = round(mean(ssrd_wm2, na.rm = TRUE), 1),
+    `Solar daylight mean (W/m²)` = round(
+      mean(ssrd_wm2[ssrd_wm2 > 0], na.rm = TRUE), 1
+    ),
+    `Temp mean (°C)`       = round(mean(temperature_2m, na.rm = TRUE), 1),
+    `Hours`                = n(),
+    .groups = "drop"
+  ) |>
+  knitr::kable(caption = "ERA5 weather summary statistics by bidding zone")
+```
+
+---
+
+*The remainder of this page focuses on DE-LU, where SMARD provides
+hourly generation by technology (wind onshore, wind offshore, solar PV)
+and BNetzA publishes installed-capacity milestones — the data needed to
+compute capacity factors and fit weather → generation models.*
+
+
+## 4.0 DE-LU weather profiles {#sec-delu-eda}
+
+### 4.1 Distributions {#sec-delu-distributions}
+
+```{r}
+#| label: fig-delu-distributions
 #| fig-height: 7
 #| fig-width: 10
 
 p_wind100 <- ggplot(era5, aes(x = wind_speed_100m)) +
-  geom_histogram(bins = 80, fill = pal["wind_onshore"], alpha = 0.7) +
+  geom_histogram(bins = 80, fill = pal["wind_onshore"], alpha = 1.7) +
   labs(title = "100 m wind speed", x = "m/s", y = "Count")
 
 p_wind10 <- ggplot(era5, aes(x = wind_speed_10m)) +
-  geom_histogram(bins = 80, fill = pal["wind_offshore"], alpha = 0.7) +
+  geom_histogram(bins = 80, fill = pal["wind_offshore"], alpha = 1.7) +
   labs(title = "10 m wind speed", x = "m/s", y = "Count")
 
 p_temp <- ggplot(era5, aes(x = temperature_2m)) +
-  geom_histogram(bins = 80, fill = "grey50", alpha = 0.7) +
+  geom_histogram(bins = 80, fill = "grey50", alpha = 1.7) +
   labs(title = "2 m temperature", x = "°C", y = "Count")
 
 p_ssrd <- era5 |>
   filter(ssrd_wm2 > 0) |>
   ggplot(aes(x = ssrd_wm2)) +
-  geom_histogram(bins = 80, fill = pal["solar"], alpha = 0.7) +
+  geom_histogram(bins = 80, fill = pal["solar"], alpha = 1.7) +
   labs(title = "Surface solar radiation (daylight only)",
        x = expression("W/m"^2), y = "Count")
 
 (p_wind100 + p_wind10) / (p_temp + p_ssrd) +
   plot_annotation(
-    title   = glue("ERA5 weather variable distributions — {zone_file} spatial average"),
+    title   = glue("ERA5 weather variable distributions — {zone_file}"),
     caption = "Source: Copernicus ERA5 reanalysis"
   )
 ```
 
-### 3.2 Seasonal diurnal profiles {#sec-era5-diurnal}
+
+### 4.2 Seasonal diurnal profiles {#sec-delu-diurnal}
 
 ```{r}
-#| label: fig-era5-diurnal
+#| label: fig-delu-diurnal
 #| fig-height: 6
 #| fig-width: 10
 
@@ -169,7 +387,7 @@ era5 |>
   facet_wrap(~ variable, scales = "free_y") +
   scale_colour_brewer(palette = "Set2") +
   labs(
-    title   = "Mean diurnal profiles by season",
+    title   = glue("Mean diurnal profiles by season — {zone_file}"),
     x       = "Hour (UTC)",
     y       = NULL,
     colour  = NULL,
@@ -178,7 +396,7 @@ era5 |>
 ```
 
 
-### 3.3 Timestamp alignment check {#sec-timestamp-check}
+### 4.3 Timestamp alignment check {#sec-timestamp-check}
 
 ERA5 `ssrd` is originally an accumulated field (J/m² per forecast step).
 Before modelling we verify that the converted instantaneous values align
@@ -220,7 +438,7 @@ era5 |>
 ```
 
 
-## 4.0 Join & capacity factors {#sec-capacity}
+## 5.0 Join & capacity factors {#sec-capacity}
 
 ```{r}
 #| label: join-datasets
@@ -304,7 +522,7 @@ cat("Observations with valid CF:",
 ```
 
 
-## 5.0 Correlation structure {#sec-correlations}
+## 6.0 Correlation structure {#sec-correlations}
 
 ```{r}
 #| label: fig-correlation
@@ -351,9 +569,9 @@ ggplot(cor_long, aes(x = var2, y = var1, fill = r)) +
 ```
 
 
-## 6.0 Scatter plots: weather → capacity factor {#sec-scatter}
+## 7.0 Scatter plots: weather → capacity factor {#sec-scatter}
 
-### 6.1 Wind speed → wind onshore CF {#sec-wind-scatter}
+### 7.1 Wind speed → wind onshore CF {#sec-wind-scatter}
 
 ```{r}
 #| label: fig-wind-scatter
@@ -363,7 +581,7 @@ model_data |>
   filter(!is.na(cf_wind_onshore)) |>
   slice_sample(n = 15000) |>
   ggplot(aes(x = wind_speed_100m, y = cf_wind_onshore)) +
-  geom_point(alpha = 0.05, colour = pal["wind_onshore"], size = 0.5) +
+  geom_point(alpha = 0.15, colour = pal["wind_onshore"], size = 0.5) +
   geom_smooth(method = "lm",
               formula = y ~ poly(x, 3),
               colour = "black", linewidth = 0.8, se = TRUE) +
@@ -379,7 +597,7 @@ model_data |>
 ```
 
 
-### 6.2 Solar irradiance → solar PV CF {#sec-solar-scatter}
+### 7.2 Solar irradiance → solar PV CF {#sec-solar-scatter}
 
 The marginal relationship between irradiance and solar CF appears
 non-monotonic when plotted unconditionally. This is not a modelling
@@ -402,7 +620,7 @@ solar_plot_df <- model_data |>
 p_marginal <- solar_plot_df |>
   slice_sample(n = 15000) |>
   ggplot(aes(x = ssrd_wm2, y = cf_solar)) +
-  geom_point(alpha = 0.05, colour = pal["solar"], size = 0.5) +
+  geom_point(alpha = 0.15, colour = pal["solar"], size = 0.5) +
   geom_smooth(method = "gam", formula = y ~ s(x),
               colour = "black", linewidth = 0.8, se = TRUE) +
   scale_y_continuous(labels = scales::percent_format()) +
@@ -421,7 +639,7 @@ p_faceted <- solar_plot_df |>
   filter(!is.na(hour_bin)) |>
   slice_sample(n = 20000) |>
   ggplot(aes(x = ssrd_wm2, y = cf_solar)) +
-  geom_point(alpha = 0.06, colour = pal["solar"], size = 0.3) +
+  geom_point(alpha = 0.16, colour = pal["solar"], size = 0.3) +
   geom_smooth(method = "gam", formula = y ~ s(x),
               colour = "black", linewidth = 0.7) +
   facet_wrap(~ hour_bin, ncol = 3) +
@@ -440,7 +658,7 @@ p_marginal | p_faceted +
 ```
 
 
-### 6.3 Midday deep dive: season resolves the remaining non-monotonicity {#sec-solar-midday}
+### 7.3 Midday deep dive: season resolves the remaining non-monotonicity {#sec-solar-midday}
 
 Even within the 10–12 UTC bin, the relationship appears non-monotonic.
 Faceting by season confirms this is a **solar geometry effect**: the
@@ -456,7 +674,7 @@ model_data |>
   filter(!is.na(cf_solar), ssrd_wm2 > 5,
          hour(datetime_utc) %in% 10:11) |>
   ggplot(aes(x = ssrd_wm2, y = cf_solar)) +
-  geom_point(alpha = 0.08, colour = pal["solar"], size = 0.5) +
+  geom_point(alpha = 0.18, colour = pal["solar"], size = 0.5) +
   geom_smooth(method = "gam", formula = y ~ s(x),
               colour = "black", linewidth = 0.8) +
   facet_wrap(~ season) +
@@ -471,7 +689,7 @@ model_data |>
 ```
 
 
-## 7.0 Capacity factor models {#sec-models}
+## 8.0 Capacity factor models {#sec-models}
 
 We fit one `tidymodels` workflow per technology using a temporal
 80/20 train/test split (no shuffling — critical for time-series
@@ -481,7 +699,7 @@ interaction terms** to capture the seasonal variation in the
 irradiance–CF slope identified in the EDA above.
 
 
-### 7.1 Wind onshore {#sec-model-wind-on}
+### 8.1 Wind onshore {#sec-model-wind-on}
 
 ```{r}
 #| label: model-wind-onshore
@@ -522,7 +740,7 @@ metrics_wind_on |>
 ```
 
 
-### 7.2 Wind offshore {#sec-model-wind-off}
+### 8.2 Wind offshore {#sec-model-wind-off}
 
 ```{r}
 #| label: model-wind-offshore
@@ -561,7 +779,7 @@ metrics_wind_off |>
 ```
 
 
-### 7.3 Solar PV {#sec-model-solar}
+### 8.3 Solar PV {#sec-model-solar}
 
 The solar recipe includes month × irradiance interactions so that the
 irradiance–CF slope can vary by month — physically motivated by the
@@ -604,7 +822,7 @@ metrics_solar |>
 ```
 
 
-## 8.0 Model diagnostics {#sec-diagnostics}
+## 9.0 Model diagnostics {#sec-diagnostics}
 
 Two diagnostic panels per technology: predicted versus actual capacity
 factor (a well-calibrated model hugs the 1:1 line) and the residual
@@ -622,7 +840,7 @@ diag_panels <- function(preds, truth_col, label, colour) {
   p_scatter <- preds |>
     slice_sample(n = n_plot) |>
     ggplot(aes(x = .data[[truth_col]], y = .pred)) +
-    geom_point(alpha = 0.05, colour = colour, size = 0.5) +
+    geom_point(alpha = 0.15, colour = colour, size = 0.5) +
     geom_abline(slope = 1, intercept = 0,
                 linetype = "dashed", colour = "grey30") +
     scale_x_continuous(labels = scales::percent_format()) +
@@ -653,7 +871,7 @@ p3 <- diag_panels(preds_solar,    "cf_solar",         "Solar PV",      pal["sola
 ```
 
 
-## 9.0 Save fitted workflows {#sec-export}
+## 10.0 Save fitted workflows {#sec-export}
 
 The fitted `tidymodels` workflow objects are serialised to `models/` for
 reuse in Stage 2 (price decomposition) and Stage 3 (risk simulation).
@@ -674,7 +892,7 @@ cat(glue("Saved 3 workflow objects to models/ ({zone_file})"), "\n")
 ```
 
 
-## 10.0 Key findings {#sec-findings}
+## 11.0 Key findings {#sec-findings}
 
 ```{r}
 #| label: summary-table
@@ -692,16 +910,24 @@ bind_rows(
   )
 ```
 
-**Interpretation.** ERA5 100 m wind speed is the dominant predictor of
-wind generation capacity factors, with the cubic polynomial capturing
-the characteristic ramp-up and saturation of a turbine power curve.
-Solar irradiance maps onto PV capacity factors with a slope that varies
-by month — an interaction effect driven by solar geometry (sun angle and
-day length). The month × irradiance terms resolve the apparent
-non-monotonicity visible in the unconditional scatter plot (@sec-solar-scatter),
-confirming that the bimodal pattern reflects seasonal regime mixing
-rather than a data quality issue. Temperature adds a modest correction
-for PV cell-efficiency losses above standard test conditions (25 °C).
+**Cross-zone context.** The ERA5 weather profiles in @sec-cross-zone
+reveal substantial geographic variation in renewable resource quality.
+Wind speeds are highest in coastal and Nordic zones, while solar
+irradiance follows a clear latitude gradient. These physical differences
+drive the cross-zone variation in renewable generation patterns — and
+ultimately in the price dynamics — explored in Stage 2.
+
+**DE-LU capacity factor models.** ERA5 100 m wind speed is the dominant
+predictor of wind generation capacity factors, with the cubic polynomial
+capturing the characteristic ramp-up and saturation of a turbine power
+curve. Solar irradiance maps onto PV capacity factors with a slope that
+varies by month — an interaction effect driven by solar geometry (sun
+angle and day length). The month × irradiance terms resolve the apparent
+non-monotonicity visible in the unconditional scatter plot
+(@sec-solar-scatter), confirming that the bimodal pattern reflects
+seasonal regime mixing rather than a data quality issue. Temperature
+adds a modest correction for PV cell-efficiency losses above standard
+test conditions (25 °C).
 
 These fitted workflows feed directly into Stage 2, where weather-driven
 generation predictions are used as features in the day-ahead price
