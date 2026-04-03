@@ -1,0 +1,1152 @@
+---
+title: "Risk Quantification & Hedging Implications"
+format:
+  html:
+    code-fold: true
+    code-summary: "Show code"
+    toc: true
+    toc-depth: 3
+    number-sections: true
+params:
+  portfolio_mw: 400
+  portfolio_tech: "wind_onshore"
+  portfolio_zone: "DE-LU"
+  comparison_zone: "DK_1"
+  n_sim: 10000
+  n_days_per_month: 30
+---
+
+```{r}
+#| label: setup
+#| include: false
+knitr::opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  cache.lazy = FALSE
+)
+
+library(tidyverse)
+library(tidymodels)
+library(arrow)
+library(glue)
+library(gt)
+library(imputeTS)
+library(scales)
+
+# ── Theme ─────────────────────────────────────────────────────────────
+theme_report <- theme_minimal(base_size = 12) +
+  theme(
+    plot.title    = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(colour = "grey40", size = 11),
+    strip.text    = element_text(face = "bold"),
+    legend.position = "bottom"
+  )
+theme_set(theme_report)
+
+# ── Colour palettes ──────────────────────────────────────────────────
+season_colours <- c(
+  Winter = "#2166AC", Spring = "#66BD63",
+  Summer = "#F46D43", Autumn = "#E6AB02"
+)
+
+variant_colours <- c(
+  "Weather-only" = "#4393C3",
+  "Full historical" = "#D6604D"
+)
+```
+
+```{r}
+#| label: load-data
+#| include: false
+
+# ── SMARD (DE-LU) ────────────────────────────────────────────────────
+smard <- read_parquet("data/processed/smard/smard_DE-LU_2020_2025.parquet") |>
+  mutate(datetime_utc = as.POSIXct(datetime_utc, tz = "UTC"))
+
+# ── ERA5 weather (DE-LU) ─────────────────────────────────────────────
+era5_delu <- read_parquet("data/processed/era5/DE-LU.parquet") |>
+  mutate(datetime_utc = as.POSIXct(datetime_utc, tz = "UTC"))
+
+# ── ENTSO-E cross-border flows ───────────────────────────────────────
+flows_raw <- read_parquet("data/processed/entsoe/crossborder_flows_2020_2025.parquet") |>
+  mutate(datetime_utc = as.POSIXct(datetime_utc, tz = "UTC"))
+
+# ── TTF gas price ─────────────────────────────────────────────────────
+ttf <- read_parquet("data/processed/ttf/ttf_daily.parquet") |>
+  mutate(date = as.Date(date))
+
+# ── ENTSO-E multi-zone prices ─────────────────────────────────────────
+prices_all <- read_parquet("data/processed/entsoe/prices_2020_2025.parquet") |>
+  mutate(datetime_utc = as.POSIXct(datetime_utc, tz = "UTC"))
+
+# ── Comparison zone generation & load ────────────────────────────────
+comp_zone <- params$comparison_zone
+
+comp_gen_raw <- read_parquet(
+  glue("data/processed/entsoe/generation_{comp_zone}_2020_2025.parquet")
+) |>
+  mutate(datetime_utc = as.POSIXct(datetime_utc, tz = "UTC"))
+
+comp_load <- read_parquet(
+  glue("data/processed/entsoe/load_{comp_zone}_2020_2025.parquet")
+) |>
+  mutate(datetime_utc = as.POSIXct(datetime_utc, tz = "UTC"))
+```
+
+```{r}
+#| label: load-models
+#| include: false
+
+# ── Stage 1 capacity factor models ───────────────────────────────────
+cf_wind_onshore  <- readRDS("models/cf_wind_onshore_DE-LU.rds")
+cf_wind_offshore <- readRDS("models/cf_wind_offshore_DE-LU.rds")
+cf_solar         <- readRDS("models/cf_solar_DE-LU.rds")
+
+# ── Stage 2 price model (elastic net) ────────────────────────────────
+price_model <- readRDS("models/price_enet_DE-LU.rds")
+```
+
+```{r}
+#| label: helper-functions
+#| include: false
+
+# ── Season assignment (meteorological) ───────────────────────────────
+assign_season <- function(datetime) {
+  m <- month(datetime)
+  case_when(
+    m %in% c(12, 1, 2)  ~ "Winter",
+    m %in% 3:5           ~ "Spring",
+    m %in% 6:8           ~ "Summer",
+    m %in% 9:11          ~ "Autumn"
+  ) |>
+    factor(levels = c("Winter", "Spring", "Summer", "Autumn"))
+}
+
+# ── Risk metric helpers ──────────────────────────────────────────────
+compute_var <- function(x, level = 0.95) {
+  quantile(x, probs = 1 - level, na.rm = TRUE)
+}
+
+compute_cvar <- function(x, level = 0.95) {
+  threshold <- compute_var(x, level)
+  mean(x[x <= threshold], na.rm = TRUE)
+}
+```
+
+
+# 1.0 Portfolio Definition {#sec-portfolio}
+
+This analysis quantifies the spot-price revenue risk facing a stylised, fully unhedged renewable energy portfolio in the `r params$portfolio_zone` bidding zone. The portfolio is defined as:
+
+```{r}
+#| label: portfolio-summary
+
+tibble(
+  Parameter = c("Installed capacity", "Technology", "Bidding zone",
+                 "Market position", "Forward hedging", "Comparison zone"),
+  Value     = c(glue("{params$portfolio_mw} MW"), params$portfolio_tech,
+                params$portfolio_zone, "Long spot (generator)",
+                "None — fully exposed to day-ahead price",
+                params$comparison_zone)
+) |>
+  gt() |>
+  tab_header(title = "Stylised Portfolio Parameters") |>
+  cols_align(align = "left")
+```
+
+::: {.callout-note}
+## What does "fully unhedged" mean?
+
+A wind farm that sells all output on the day-ahead spot market earns revenue = price × generation in each delivery hour. Both sides of this equation are weather-driven: wind speed determines generation volume, while the aggregate wind and solar fleet drives the renewable share that (per Stage 2) is the dominant price factor in summer. This creates a **natural short hedge** — high wind hours produce more MWh but depress the price via the merit order effect. The simulation below quantifies how much residual risk remains after this embedded correlation.
+:::
+
+
+# 2.0 Monte Carlo Framework {#sec-montecarlo}
+
+## 2.1 Feature Engineering {#sec-features}
+
+We reconstruct the same feature set used in the Stage 2 price model: renewable share, residual load, net export balance, TTF gas price, hour of day, and season.
+
+```{r}
+#| label: de-lu-net-exports
+#| cache: true
+
+# ── Aggregate cross-border flows to hourly net export balance ────────
+# Identify DE-LU flow columns
+export_cols <- names(flows_raw) |>
+  str_subset("^DE_LU->") |>
+  str_subset("datetime", negate = TRUE)
+
+import_cols <- names(flows_raw) |>
+  str_subset("->DE_LU$")
+
+flows_delu <- flows_raw |>
+  select(datetime_utc, all_of(c(export_cols, import_cols))) |>
+  mutate(datetime_utc = floor_date(datetime_utc, "hour")) |>
+  group_by(datetime_utc) |>
+  summarise(
+    across(everything(), \(x) mean(x, na.rm = TRUE)),
+    .groups = "drop"
+  ) |>
+  mutate(
+    total_exports = rowSums(pick(all_of(export_cols)), na.rm = TRUE),
+    total_imports = rowSums(pick(all_of(import_cols)), na.rm = TRUE),
+    net_export_mw = total_exports - total_imports
+  ) |>
+  select(datetime_utc, net_export_mw)
+```
+
+```{r}
+#| label: build-scenario-table
+#| cache: true
+
+# ── Join all data sources into a single scenario table ───────────────
+scenario_df <- smard |>
+  # Derived generation features
+  mutate(
+    wind_total  = wind_onshore + wind_offshore,
+    solar_total = solar,
+    renewable_gen = wind_total + solar_total,
+    renewable_share = renewable_gen / total_load,
+    residual_load = total_load - renewable_gen,
+    date = as_date(datetime_utc),
+    hour = hour(datetime_utc),
+    dow  = wday(datetime_utc, label = TRUE, week_start = 1),
+    season = assign_season(datetime_utc),
+    month = factor(month(datetime_utc, label = TRUE), ordered = FALSE)
+  ) |>
+  # Join ERA5 weather
+  left_join(era5_delu, by = "datetime_utc") |>
+  # Join cross-border flows
+  left_join(flows_delu, by = "datetime_utc") |>
+  # Join TTF gas price (daily → hourly via date)
+  left_join(ttf, by = "date")
+
+cat("Scenario table:", nrow(scenario_df), "rows,",
+    sum(complete.cases(scenario_df)), "complete cases\n")
+```
+
+```{r}
+#| label: impute-features
+
+# ── Impute missing values (matching 03_prices.qmd strategy) ──────────
+# Kalman smoother for time-series features; TTF forward/back-filled
+scenario_df <- scenario_df |>
+  arrange(datetime_utc) |>
+  mutate(
+    renewable_share    = na_kalman(renewable_share, model = "StructTS"),
+    residual_load      = na_kalman(residual_load, model = "StructTS"),
+    net_export_mw      = na_kalman(net_export_mw, model = "StructTS"),
+    ttf_eur_mwh        = zoo::na.locf(zoo::na.locf(ttf_eur_mwh, na.rm = FALSE),
+                                       fromLast = TRUE)
+  )
+
+n_remaining_na <- scenario_df |>
+  select(renewable_share, residual_load, net_export_mw, ttf_eur_mwh) |>
+  summarise(across(everything(), \(x) sum(is.na(x))))
+
+cat("Remaining NAs after imputation:\n")
+print(n_remaining_na)
+```
+
+
+## 2.2 Predict Prices & Generation {#sec-predict}
+
+We pre-compute predicted prices and portfolio generation for every historical hour before resampling. This keeps the Monte Carlo loop fast — it only needs to sample and sum pre-computed daily revenues.
+
+**Variant A (weather-only):** TTF and net export balance fixed at their seasonal medians. Isolates the pure weather-driven component of price risk.
+
+**Variant B (full historical):** All features drawn from the same historical day. Captures total risk including gas price and cross-border flow co-movement.
+
+```{r}
+#| label: seasonal-medians
+
+# ── Compute seasonal medians for Variant A ───────────────────────────
+seasonal_medians <- scenario_df |>
+  group_by(season) |>
+  summarise(
+    ttf_median     = median(ttf_eur_mwh, na.rm = TRUE),
+    exports_median = median(net_export_mw, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+seasonal_medians |>
+  gt() |>
+  fmt_number(columns = c(ttf_median, exports_median), decimals = 1) |>
+  cols_label(
+    season         = "Season",
+    ttf_median     = "TTF Median (EUR/MWh)",
+    exports_median = "Net Exports Median (MW)"
+  ) |>
+  tab_header(title = "Conditional Values for Weather-Only Variant")
+```
+
+```{r}
+#| label: predict-prices
+#| cache: true
+
+# ── Variant B: predict with original features ────────────────────────
+scenario_df <- scenario_df |>
+  mutate(pred_price_b = predict(price_model, new_data = scenario_df)$.pred)
+
+# ── Variant A: swap in seasonal medians, then predict ────────────────
+scenario_a <- scenario_df |>
+  select(-ttf_eur_mwh, -net_export_mw) |>
+  left_join(seasonal_medians, by = "season") |>
+  rename(
+    ttf_eur_mwh    = ttf_median,
+    net_export_mw  = exports_median
+  )
+
+scenario_df <- scenario_df |>
+  mutate(pred_price_a = predict(price_model, new_data = scenario_a)$.pred)
+```
+
+```{r}
+#| label: predict-generation
+#| cache: true
+
+# ── Portfolio generation via Stage 1 CF model ────────────────────────
+# CF models (02_weather.qmd) expect hour and month as factors,
+# while the price model (03_prices.qmd) expects hour as integer.
+# Convert only for the CF prediction.
+cf_input <- scenario_df |>
+  mutate(
+    hour  = factor(hour),
+    month = factor(month)
+  )
+
+scenario_df <- scenario_df |>
+  mutate(
+    pred_cf = predict(cf_wind_onshore, new_data = cf_input)$.pred,
+    pred_cf = pmax(pred_cf, 0),
+    # Generation in MWh per hour (hourly data, so MW = MWh/h)
+    portfolio_gen_mwh = pred_cf * params$portfolio_mw
+  )
+
+rm(cf_input)
+
+# ── Hourly revenue: price × generation ───────────────────────────────
+scenario_df <- scenario_df |>
+  mutate(
+    revenue_a = pred_price_a * portfolio_gen_mwh,
+    revenue_b = pred_price_b * portfolio_gen_mwh
+  )
+
+cat("Predicted CF range:",
+    round(range(scenario_df$pred_cf, na.rm = TRUE), 3), "\n")
+cat("Mean portfolio generation:",
+    round(mean(scenario_df$portfolio_gen_mwh, na.rm = TRUE), 1), "MWh/h\n")
+```
+
+
+## 2.3 Daily Revenue Aggregation {#sec-daily}
+
+```{r}
+#| label: daily-revenue
+#| cache: true
+
+# ── Aggregate hourly revenue to daily totals ─────────────────────────
+daily_revenue <- scenario_df |>
+  filter(!is.na(revenue_a), !is.na(revenue_b)) |>
+  group_by(date, season, month) |>
+  summarise(
+    daily_rev_a     = sum(revenue_a),
+    daily_rev_b     = sum(revenue_b),
+    daily_gen_mwh   = sum(portfolio_gen_mwh),
+    daily_price_a   = mean(pred_price_a),
+    daily_price_b   = mean(pred_price_b),
+    n_hours         = n(),
+    .groups = "drop"
+  ) |>
+  # Keep only complete days (24 hours)
+  filter(n_hours == 24)
+
+cat("Complete days:", nrow(daily_revenue), "\n")
+cat("Days by season:\n")
+print(count(daily_revenue, season))
+```
+
+
+## 2.4 Bootstrap Simulation {#sec-bootstrap}
+
+For each season, we construct `r comma(params$n_sim)` synthetic months by sampling `r params$n_days_per_month` days (with replacement) from that season's historical pool. The same sampled days are used for both variants, so the difference between them isolates the contribution of TTF and cross-border flow variability to revenue risk.
+
+```{r}
+#| label: run-simulation
+#| cache: true
+
+set.seed(2026)
+n_sim           <- params$n_sim
+n_days_per_month <- params$n_days_per_month
+
+sim_results <- daily_revenue |>
+  group_by(season) |>
+  group_modify(\(data, key) {
+    n_pool <- nrow(data)
+
+    # Matrix of sampled row indices: n_days_per_month × n_sim
+    idx <- matrix(
+      sample.int(n_pool, size = n_days_per_month * n_sim, replace = TRUE),
+      nrow = n_days_per_month, ncol = n_sim
+    )
+
+    tibble(
+      sim_id       = 1:n_sim,
+      # Monthly revenue (EUR) — sum of sampled daily revenues
+      monthly_rev_a = colSums(matrix(data$daily_rev_a[idx],
+                                     nrow = n_days_per_month)),
+      monthly_rev_b = colSums(matrix(data$daily_rev_b[idx],
+                                     nrow = n_days_per_month)),
+      # Monthly generation (MWh)
+      monthly_gen   = colSums(matrix(data$daily_gen_mwh[idx],
+                                     nrow = n_days_per_month)),
+      # Average daily price (EUR/MWh) — mean of sampled daily averages
+      avg_price_a   = colMeans(matrix(data$daily_price_a[idx],
+                                      nrow = n_days_per_month)),
+      avg_price_b   = colMeans(matrix(data$daily_price_b[idx],
+                                      nrow = n_days_per_month))
+    )
+  }) |>
+  ungroup()
+
+cat("Simulation complete:", nrow(sim_results), "rows\n")
+cat("(", n_sim, "simulations ×", n_distinct(sim_results$season), "seasons )\n")
+```
+
+
+## 2.5 Variant Comparison {#sec-variant-compare}
+
+```{r}
+#| label: fig-revenue-distributions
+#| fig-cap: "Monthly revenue distributions by season and simulation variant"
+#| fig-height: 8
+
+sim_long <- sim_results |>
+  pivot_longer(
+    cols = c(monthly_rev_a, monthly_rev_b),
+    names_to  = "variant",
+    values_to = "monthly_revenue"
+  ) |>
+  mutate(
+    variant = recode(variant,
+      monthly_rev_a = "Weather-only",
+      monthly_rev_b = "Full historical"
+    ),
+    monthly_revenue_meur = monthly_revenue / 1e6
+  )
+
+ggplot(sim_long, aes(x = monthly_revenue_meur, fill = variant)) +
+  geom_density(alpha = 0.4, colour = NA) +
+  geom_vline(
+    data = sim_long |>
+      group_by(season, variant) |>
+      summarise(med = median(monthly_revenue_meur), .groups = "drop"),
+    aes(xintercept = med, colour = variant),
+    linetype = "dashed", linewidth = 0.6
+  ) +
+  facet_wrap(~ season, scales = "free_x", ncol = 2) +
+  scale_fill_manual(values = variant_colours) +
+  scale_colour_manual(values = variant_colours) +
+  labs(
+    title    = glue("{params$portfolio_mw} MW {params$portfolio_tech} — Monthly Revenue Distribution"),
+    subtitle = "Dashed lines show median. Weather-only variant fixes TTF & net exports at seasonal medians.",
+    x = "Monthly Revenue (M EUR)",
+    y = "Density",
+    fill = "Variant", colour = "Variant"
+  )
+```
+
+```{r}
+#| label: fig-price-distributions
+#| fig-cap: "Simulated average monthly price by season and variant"
+
+sim_price_long <- sim_results |>
+  pivot_longer(
+    cols = c(avg_price_a, avg_price_b),
+    names_to  = "variant",
+    values_to = "avg_price"
+  ) |>
+  mutate(
+    variant = recode(variant,
+      avg_price_a = "Weather-only",
+      avg_price_b = "Full historical"
+    )
+  )
+
+ggplot(sim_price_long, aes(x = avg_price, fill = variant)) +
+  geom_density(alpha = 0.4, colour = NA) +
+  facet_wrap(~ season, scales = "free_x", ncol = 2) +
+  scale_fill_manual(values = variant_colours) +
+  labs(
+    title    = "Simulated Average Monthly Spot Price",
+    subtitle = "Weather-only variant isolates price risk from renewable variability alone",
+    x = "Average Monthly Price (EUR/MWh)",
+    y = "Density",
+    fill = "Variant"
+  )
+```
+
+```{r}
+#| label: variant-risk-summary
+
+# ── Summary table: how much wider is the full-historical distribution? ──
+variant_summary <- sim_results |>
+  group_by(season) |>
+  summarise(
+    sd_rev_a   = sd(monthly_rev_a) / 1e6,
+    sd_rev_b   = sd(monthly_rev_b) / 1e6,
+    sd_ratio   = sd(monthly_rev_b) / sd(monthly_rev_a),
+    cvar95_a   = compute_cvar(monthly_rev_a, 0.95) / 1e6,
+    cvar95_b   = compute_cvar(monthly_rev_b, 0.95) / 1e6,
+    .groups = "drop"
+  )
+
+variant_summary |>
+  gt() |>
+  fmt_number(columns = c(sd_rev_a, sd_rev_b, cvar95_a, cvar95_b), decimals = 2) |>
+  fmt_number(columns = sd_ratio, decimals = 2) |>
+  cols_label(
+    season   = "Season",
+    sd_rev_a = "SD Weather-only (M EUR)",
+    sd_rev_b = "SD Full (M EUR)",
+    sd_ratio = "SD Ratio (Full / Weather)",
+    cvar95_a = "CVaR 95% Weather (M EUR)",
+    cvar95_b = "CVaR 95% Full (M EUR)"
+  ) |>
+  tab_header(
+    title    = "Revenue Risk: Weather-Only vs Full Historical",
+    subtitle = glue("{params$portfolio_mw} MW {params$portfolio_tech} — Monthly Revenue")
+  ) |>
+  tab_footnote("SD ratio > 1 indicates additional risk from TTF and cross-border flow variability.")
+```
+
+
+# 3.0 Risk Metrics {#sec-risk-metrics}
+
+How much could a bad month cost? The table below answers that for each season, showing central revenue estimates alongside downside tail risk. VaR tells you the revenue floor you'll stay above in 95% (or 99%) of months. CVaR tells you the average revenue in those worst-case months — it captures how bad "bad" actually gets.
+
+```{r}
+#| label: risk-metrics-table
+
+risk_metrics <- sim_results |>
+  group_by(season) |>
+  summarise(
+    median_rev     = median(monthly_rev_b) / 1e6,
+    mean_rev       = mean(monthly_rev_b) / 1e6,
+    sd_rev         = sd(monthly_rev_b) / 1e6,
+    var_95         = compute_var(monthly_rev_b, 0.95) / 1e6,
+    var_99         = compute_var(monthly_rev_b, 0.99) / 1e6,
+    cvar_95        = compute_cvar(monthly_rev_b, 0.95) / 1e6,
+    cvar_99        = compute_cvar(monthly_rev_b, 0.99) / 1e6,
+    weather_share  = sd(monthly_rev_a) / sd(monthly_rev_b),
+    .groups = "drop"
+  )
+
+risk_metrics |>
+  gt() |>
+  fmt_number(columns = c(median_rev, mean_rev, sd_rev,
+                          var_95, var_99, cvar_95, cvar_99), decimals = 2) |>
+  fmt_percent(columns = weather_share, decimals = 0) |>
+  cols_label(
+    season        = "Season",
+    median_rev    = "Median",
+    mean_rev      = "Mean",
+    sd_rev        = "Std Dev",
+    var_95        = "VaR 95%",
+    var_99        = "VaR 99%",
+    cvar_95       = "CVaR 95%",
+    cvar_99       = "CVaR 99%",
+    weather_share = "Weather Share"
+  ) |>
+  tab_header(
+    title    = glue("Monthly Revenue Risk — {params$portfolio_mw} MW Onshore Wind in {params$portfolio_zone}"),
+    subtitle = "All values in M EUR. Full historical variant (weather + gas + cross-border flows)."
+  ) |>
+  tab_spanner(label = "Central Estimate", columns = c(median_rev, mean_rev)) |>
+  tab_spanner(label = "Spread", columns = c(sd_rev)) |>
+  tab_spanner(label = "Downside Risk", columns = c(var_95, var_99, cvar_95, cvar_99)) |>
+  tab_footnote(
+    "Weather Share = fraction of total revenue volatility attributable to wind variability alone. The remainder comes from gas price and cross-border flow movements."
+  )
+```
+
+::: {.callout-tip}
+## Reading the table
+
+Pick a row — say Winter. The median month brings in the figure shown under Median. But in the worst 5% of months (CVaR 95%), revenue drops to the CVaR 95% figure. The **Weather Share** column is the key link back to Stage 2: it tells you how much of that revenue swing comes purely from wind variability versus gas and trade flow uncertainty. A low weather share means hedging weather alone won't cover most of your risk.
+:::
+
+
+# 4.0 Cross-Zone Analysis {#sec-cross-zone}
+
+Can a generator reduce risk by selling into multiple bidding zones? If prices in different zones move independently, geographic diversification works well. If they move in lockstep — driven by the same weather systems sweeping across Europe — the benefit is limited.
+
+## 4.1 Price Correlation Across European Bidding Zones {#sec-price-corr}
+
+```{r}
+#| label: price-correlation-matrix
+#| cache: true
+
+# ── Hourly price correlation matrix across all zones ─────────────────
+price_matrix <- prices_all |>
+  select(-datetime_utc) |>
+  cor(use = "pairwise.complete.obs")
+
+# ── Reorder by hierarchical clustering for visual clarity ────────────
+hc <- hclust(as.dist(1 - price_matrix))
+price_matrix_ordered <- price_matrix[hc$order, hc$order]
+```
+
+```{r}
+#| label: fig-price-correlation-heatmap
+#| fig-cap: "Hourly day-ahead price correlations across European bidding zones (2020–2025)"
+#| fig-height: 8
+#| fig-width: 9
+
+cor_long <- price_matrix_ordered |>
+  as.data.frame() |>
+  rownames_to_column("zone_1") |>
+  pivot_longer(-zone_1, names_to = "zone_2", values_to = "correlation") |>
+  mutate(
+    zone_1 = factor(zone_1, levels = rownames(price_matrix_ordered)),
+    zone_2 = factor(zone_2, levels = rownames(price_matrix_ordered))
+  )
+
+ggplot(cor_long, aes(x = zone_1, y = zone_2, fill = correlation)) +
+  geom_tile(colour = "white", linewidth = 0.3) +
+  geom_text(aes(label = sprintf("%.2f", correlation)),
+            size = 2.5, colour = "grey20") +
+  scale_fill_gradientn(
+    colours = c("#2166AC", "#67A9CF", "#F7F7F7", "#EF8A62", "#B2182B"),
+    values  = scales::rescale(c(0, 0.25, 0.5, 0.75, 1)),
+    limits  = c(0, 1),
+    name    = "Correlation"
+  ) +
+  labs(
+    title    = "How Closely Do European Electricity Prices Move Together?",
+    subtitle = "High correlation = limited diversification from cross-border hedging",
+    x = NULL, y = NULL
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    axis.text.y = element_text(size = 9)
+  )
+```
+
+
+## 4.2 Geographic View — Price Linkages Across Europe {#sec-geo-map}
+
+```{r}
+#| label: fig-zone-correlation-map
+#| fig-cap: "Price correlation with DE-LU across European bidding zones — hover for details"
+#| cache: true
+
+library(plotly)
+
+# ── Zone centroids (approximate geographic centres) ──────────────────
+zone_coords <- tribble(
+  ~zone,   ~lat,  ~lon,  ~label,
+  "DE_LU", 51.0,  10.0,  "DE-LU",
+  "FR",    46.5,   2.5,  "FR",
+  "NL",    52.0,   5.5,  "NL",
+  "BE",    50.8,   4.5,  "BE",
+  "AT",    47.5,  14.0,  "AT",
+  "DK_1",  56.0,   9.5,  "DK1",
+  "DK_2",  55.5,  12.0,  "DK2",
+  "NO_1",  60.0,  10.5,  "NO1",
+  "NO_2",  59.0,   6.0,  "NO2",
+  "NO_3",  63.5,  10.5,  "NO3",
+  "NO_4",  68.0,  15.5,  "NO4",
+  "NO_5",  60.5,   6.5,  "NO5",
+  "SE_1",  66.0,  18.0,  "SE1",
+  "SE_2",  63.0,  16.0,  "SE2",
+  "SE_3",  59.0,  16.0,  "SE3",
+  "SE_4",  56.5,  14.5,  "SE4",
+  "FI",    62.0,  26.0,  "FI"
+)
+
+# ── DE-LU correlations ──────────────────────────────────────────────
+delu_corr <- tibble(
+  zone       = rownames(price_matrix),
+  corr_de_lu = price_matrix[, "DE_LU"]
+) |>
+  filter(zone != "DE_LU") |>
+  left_join(zone_coords, by = "zone")
+
+delu_point <- zone_coords |> filter(zone == "DE_LU")
+
+# ── Colour mapping (sequential: blue → red) ─────────────────────────
+corr_to_colour <- colorRamp(c("#2166AC", "#67A9CF", "#F7F7F7",
+                               "#EF8A62", "#B2182B"))
+
+delu_corr <- delu_corr |>
+  mutate(
+    colour_rgb = map_chr(corr_de_lu, \(x) {
+      rgb_vals <- corr_to_colour(x)
+      sprintf("rgb(%d,%d,%d)",
+              round(rgb_vals[1]), round(rgb_vals[2]), round(rgb_vals[3]))
+    }),
+    hover_text = paste0(
+      "<b>", label, "</b><br>",
+      "Correlation with DE-LU: <b>", sprintf("%.2f", corr_de_lu), "</b>"
+    )
+  )
+
+# ── Build plotly geo map ─────────────────────────────────────────────
+fig <- plot_geo() |>
+  layout(
+    title = list(
+      text = "How Correlated Are European Electricity Prices with Germany?",
+      font = list(size = 16)
+    ),
+    geo = list(
+      scope = "europe",
+      projection = list(type = "mercator"),
+      lonaxis = list(range = c(-5, 30)),
+      lataxis = list(range = c(44, 72)),
+      showland = TRUE, landcolor = "rgb(243,243,243)",
+      showocean = TRUE, oceancolor = "rgb(225,235,245)",
+      showcountries = TRUE, countrycolor = "rgb(180,180,180)",
+      showlakes = TRUE, lakecolor = "rgb(225,235,245)",
+      showcoastlines = TRUE, coastlinecolor = "rgb(180,180,180)",
+      resolution = 50
+    ),
+    showlegend = FALSE,
+    margin = list(t = 60, b = 20)
+  )
+
+# ── Connection lines from DE-LU to each zone ────────────────────────
+for (i in seq_len(nrow(delu_corr))) {
+  row <- delu_corr[i, ]
+  fig <- fig |>
+    add_trace(
+      type = "scattergeo", mode = "lines",
+      lon = c(delu_point$lon, row$lon),
+      lat = c(delu_point$lat, row$lat),
+      line = list(
+        width = row$corr_de_lu * 4,
+        color = row$colour_rgb
+      ),
+      opacity = 0.6,
+      hoverinfo = "none"
+    )
+}
+
+# ── Zone markers (sized and coloured by correlation) ─────────────────
+fig <- fig |>
+  add_trace(
+    type = "scattergeo", mode = "markers+text",
+    data = delu_corr,
+    lon = ~lon, lat = ~lat,
+    marker = list(
+      size = ~corr_de_lu * 25 + 5,
+      color = ~colour_rgb,
+      line = list(width = 1.5, color = "white")
+    ),
+    text = ~paste0(label, " (", sprintf("%.2f", corr_de_lu), ")"),
+    textposition = "top center",
+    textfont = list(size = 10, color = "rgb(50,50,50)"),
+    hovertext = ~hover_text,
+    hoverinfo = "text"
+  )
+
+# ── DE-LU reference marker ──────────────────────────────────────────
+fig <- fig |>
+  add_trace(
+    type = "scattergeo", mode = "markers+text",
+    lon = delu_point$lon, lat = delu_point$lat,
+    marker = list(
+      size = 16, color = "#B2182B", symbol = "diamond",
+      line = list(width = 2, color = "white")
+    ),
+    text = "DE-LU", textposition = "top center",
+    textfont = list(size = 12, color = "#B2182B", family = "Arial Black"),
+    hovertext = "<b>DE-LU</b><br>Reference zone",
+    hoverinfo = "text"
+  )
+
+fig
+```
+
+::: {.callout-note}
+## What the map tells us
+
+Zones physically close to Germany (AT, NL, BE) show very high price correlation — their markets are tightly coupled through interconnectors. The Nordic zones (NO, SE, FI) are less correlated, meaning a portfolio spanning both CWE and the Nordics would capture some diversification benefit. But even the lowest correlations are well above zero: no European zone offers a true hedge against German price moves.
+:::
+
+
+## 4.3 Seasonal Price Correlation {#sec-seasonal-corr}
+
+Price linkages aren't fixed — they shift with season as weather patterns and demand fundamentals change.
+
+```{r}
+#| label: fig-seasonal-correlation
+#| fig-cap: "DE-LU price correlation with neighbouring zones varies by season"
+#| fig-height: 5
+
+comparison_zones <- c("AT", "NL", "FR", "BE", "DK_1", "DK_2",
+                       "NO_1", "NO_2", "SE_3", "SE_4", "FI")
+
+seasonal_corr <- prices_all |>
+  mutate(season = assign_season(datetime_utc)) |>
+  group_by(season) |>
+  group_modify(\(data, key) {
+    corrs <- data |>
+      select(all_of(c("DE_LU", comparison_zones))) |>
+      cor(use = "pairwise.complete.obs")
+
+    tibble(
+      zone        = comparison_zones,
+      correlation = corrs["DE_LU", comparison_zones]
+    )
+  }) |>
+  ungroup()
+
+ggplot(seasonal_corr, aes(x = reorder(zone, -correlation),
+                           y = correlation, fill = season)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  scale_fill_manual(values = season_colours) +
+  geom_hline(yintercept = c(0.5, 0.75), linetype = "dotted",
+             colour = "grey50") +
+  labs(
+    title    = "Price Correlation with DE-LU Shifts by Season",
+    subtitle = "CWE neighbours stay tightly linked year-round; Nordic correlation varies more",
+    x = NULL, y = "Correlation with DE-LU", fill = "Season"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+# 5.0 `r params$comparison_zone` Comparison {#sec-comparison}
+
+`r params$comparison_zone` serves as a natural comparison to DE-LU. By fitting the same regression structure to a zone with a different generation mix, we can see how market composition shapes the seasonal risk profile.
+
+## 5.1 Feature Engineering {#sec-comp-features}
+
+```{r}
+#| label: comp-feature-engineering
+#| cache: true
+
+# ── Clean comparison zone generation: standardise names, hourly agg ──
+# ENTSO-E columns use spaces; select what's available
+available_gen_cols <- names(comp_gen_raw) |>
+  str_subset("^(Wind Onshore|Wind Offshore|Solar|Fossil Gas|datetime_utc)$")
+
+comp_gen <- comp_gen_raw |>
+  select(all_of(available_gen_cols))
+
+# Standardise names
+comp_gen <- comp_gen |>
+  rename_with(\(x) case_when(
+    x == "Wind Onshore"  ~ "wind_onshore",
+    x == "Wind Offshore" ~ "wind_offshore",
+    x == "Solar"         ~ "solar",
+    x == "Fossil Gas"    ~ "fossil_gas",
+    TRUE                 ~ x
+  ))
+
+# Add zeros for missing columns (e.g. some zones lack offshore wind)
+for (col in c("wind_onshore", "wind_offshore", "solar", "fossil_gas")) {
+  if (!col %in% names(comp_gen)) comp_gen[[col]] <- 0
+}
+
+# Aggregate to hourly (generation file may be sub-hourly)
+comp_gen <- comp_gen |>
+  mutate(datetime_utc = floor_date(datetime_utc, "hour")) |>
+  group_by(datetime_utc) |>
+  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)),
+            .groups = "drop")
+
+# ── Comparison zone net exports ──────────────────────────────────────
+comp_export_cols <- names(flows_raw) |>
+  str_subset(glue("^{comp_zone}->")) |>
+  str_subset("datetime", negate = TRUE)
+
+comp_import_cols <- names(flows_raw) |>
+  str_subset(glue("->{comp_zone}$"))
+
+flows_comp <- flows_raw |>
+  select(datetime_utc, all_of(c(comp_export_cols, comp_import_cols))) |>
+  mutate(datetime_utc = floor_date(datetime_utc, "hour")) |>
+  group_by(datetime_utc) |>
+  summarise(across(everything(), \(x) mean(x, na.rm = TRUE)),
+            .groups = "drop") |>
+  mutate(
+    total_exports = rowSums(pick(all_of(comp_export_cols)), na.rm = TRUE),
+    total_imports = rowSums(pick(all_of(comp_import_cols)), na.rm = TRUE),
+    net_export_mw = total_exports - total_imports
+  ) |>
+  select(datetime_utc, net_export_mw)
+
+# ── Comparison zone prices ───────────────────────────────────────────
+comp_prices <- prices_all |>
+  select(datetime_utc, comp_price = all_of(comp_zone))
+
+# ── Assemble comparison scenario table ───────────────────────────────
+comp_df <- comp_gen |>
+  left_join(comp_load, by = "datetime_utc") |>
+  mutate(
+    renewable_gen   = wind_onshore + wind_offshore + solar,
+    renewable_share = renewable_gen / total_load,
+    residual_load   = total_load - renewable_gen,
+    date   = as_date(datetime_utc),
+    hour   = hour(datetime_utc),
+    dow    = wday(datetime_utc, label = TRUE, week_start = 1),
+    season = assign_season(datetime_utc)
+  ) |>
+  left_join(flows_comp, by = "datetime_utc") |>
+  left_join(comp_prices, by = "datetime_utc") |>
+  left_join(ttf, by = "date") |>
+  arrange(datetime_utc) |>
+  mutate(
+    renewable_share = na_kalman(renewable_share, model = "StructTS"),
+    residual_load   = na_kalman(residual_load, model = "StructTS"),
+    net_export_mw   = na_kalman(net_export_mw, model = "StructTS"),
+    ttf_eur_mwh     = zoo::na.locf(zoo::na.locf(ttf_eur_mwh, na.rm = FALSE),
+                                    fromLast = TRUE)
+  ) |>
+  filter(!is.na(comp_price))
+
+cat(glue("{comp_zone} scenario table: {nrow(comp_df)} rows, ",
+         "{sum(complete.cases(comp_df))} complete cases\n"))
+```
+
+
+## 5.2 Seasonal Variance Attribution {#sec-comp-regression}
+
+We fit the same model structure as Stage 2 — OLS with the same feature groups — within each season. Partial R² measures how much price variance each feature group explains: drop the feature, see how much R² falls.
+
+```{r}
+#| label: comp-partial-r2
+#| cache: true
+
+# ── Partial R² by feature group, by season ───────────────────────────
+feature_groups <- list(
+  "Renewable share" = "renewable_share",
+  "Residual load"   = "residual_load",
+  "Net exports"     = "net_export_mw",
+  "TTF gas price"   = "ttf_eur_mwh",
+  "Hour of day"     = "factor(hour)",
+  "Day of week"     = "dow"
+)
+
+full_formula <- comp_price ~ renewable_share + residual_load +
+  net_export_mw + ttf_eur_mwh + factor(hour) + dow
+
+# ── Helper: compute partial R² for one season ───────────────────────
+compute_partial_r2 <- function(data, full_form, groups) {
+  full_fit <- lm(full_form, data = data)
+  full_r2  <- summary(full_fit)$r.squared
+
+  map_dfr(names(groups), \(gname) {
+    drop_term <- groups[[gname]]
+    # Build reduced formula by removing the term
+    reduced_form <- update(full_form, paste("~ . -", drop_term))
+    reduced_fit  <- lm(reduced_form, data = data)
+    reduced_r2   <- summary(reduced_fit)$r.squared
+
+    tibble(
+      feature_group = gname,
+      partial_r2    = full_r2 - reduced_r2
+    )
+  }) |>
+    mutate(full_r2 = full_r2)
+}
+
+comp_partial <- map_dfr(levels(comp_df$season), \(s) {
+  sdata <- comp_df |> filter(season == s)
+  compute_partial_r2(sdata, full_formula, feature_groups) |>
+    mutate(season = s, zone = comp_zone)
+})
+
+# ── Same analysis for DE-LU (using scenario_df from earlier) ────────
+delu_formula <- price_de_lu ~ renewable_share + residual_load +
+  net_export_mw + ttf_eur_mwh + factor(hour) + dow
+
+delu_partial <- map_dfr(levels(scenario_df$season), \(s) {
+  sdata <- scenario_df |> filter(season == s)
+  compute_partial_r2(sdata, delu_formula, feature_groups) |>
+    mutate(season = s, zone = "DE_LU")
+})
+
+# ── Combine for plotting ────────────────────────────────────────────
+partial_r2_combined <- bind_rows(delu_partial, comp_partial)
+```
+
+```{r}
+#| label: fig-partial-r2-comparison
+#| fig-cap: "Seasonal variance attribution — which factors drive prices in each zone?"
+#| fig-height: 7
+#| fig-width: 10
+
+ggplot(partial_r2_combined,
+       aes(x = feature_group, y = partial_r2, fill = zone)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  facet_wrap(~ season, ncol = 2) +
+  scale_fill_manual(
+    values = c("DE_LU" = "#4393C3", setNames("#D6604D", comp_zone)),
+    labels = c("DE_LU" = "DE-LU", setNames(comp_zone, comp_zone))
+  ) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(
+    title    = glue("What Drives Prices? DE-LU vs {comp_zone}"),
+    subtitle = "Partial R² — the price variance explained by each feature group, by season",
+    x = NULL, y = "Partial R² (share of price variance explained)",
+    fill = "Zone"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#| label: comp-r2-summary-table
+
+# ── Summary: dominant factor per zone × season ──────────────────────
+r2_summary <- partial_r2_combined |>
+  group_by(zone, season) |>
+  slice_max(partial_r2, n = 1) |>
+  ungroup() |>
+  select(Zone = zone, Season = season,
+         `Dominant Factor` = feature_group,
+         `Partial R²` = partial_r2, `Full R²` = full_r2)
+
+r2_summary |>
+  gt() |>
+  fmt_percent(columns = c(`Partial R²`, `Full R²`), decimals = 1) |>
+  tab_header(
+    title    = glue("Dominant Price Driver by Season — DE-LU vs {comp_zone}"),
+    subtitle = "The single feature group explaining the most price variance in each season"
+  )
+```
+
+::: {.callout-note}
+## Interpreting the comparison
+
+If `r comp_zone` has higher wind penetration than Germany, we'd expect renewable share to dominate price variance across more seasons — not just summer. Conversely, if gas generation plays a smaller role, TTF should matter less. These structural differences determine what a hedging strategy needs to cover in each market.
+:::
+
+
+# 6.0 Hedging Implications {#sec-hedging}
+
+## 6.1 What the Risk Structure Means for Hedging
+
+The analysis above reveals a clear seasonal pattern in what drives revenue risk for a wind portfolio:
+
+```{r}
+#| label: hedging-summary
+
+# ── Synthesise key findings into a narrative table ──────────────────
+hedging_df <- risk_metrics |>
+  left_join(
+    variant_summary |> select(season, sd_ratio),
+    by = "season"
+  ) |>
+  mutate(
+    weather_pct  = scales::percent(weather_share, accuracy = 1),
+    market_pct   = scales::percent(1 - weather_share, accuracy = 1),
+    recommendation = case_when(
+      weather_share > 0.6 ~ "Weather derivatives or volume hedging most effective",
+      weather_share < 0.4 ~ "Gas price exposure management (TTF swaps) is priority",
+      TRUE                ~ "Blended approach: both weather and gas hedges needed"
+    )
+  ) |>
+  select(
+    Season           = season,
+    `Monthly CVaR 95% (M EUR)` = cvar_95,
+    `Weather-Driven`  = weather_pct,
+    `Market-Driven`   = market_pct,
+    `Hedging Focus`   = recommendation
+  )
+
+hedging_df |>
+  gt() |>
+  fmt_number(columns = `Monthly CVaR 95% (M EUR)`, decimals = 2) |>
+  tab_header(
+    title    = "Seasonal Hedging Strategy Guide",
+    subtitle = glue("{params$portfolio_mw} MW onshore wind in {params$portfolio_zone}")
+  ) |>
+  tab_footnote("Weather-Driven = share of revenue volatility from wind variability; Market-Driven = gas + cross-border flows.")
+```
+
+## 6.2 Cross-Border Capacity as a Risk Tool {#sec-fca}
+
+The ENTSO-E [Forward Capacity Allocation (FCA) regulation](https://www.entsoe.eu/network_codes/fca/) governs how cross-border transmission rights are allocated — the framework that determines whether generators can actually access neighbouring markets for hedging purposes.
+
+Our cross-zone analysis shows why this matters:
+
+- **CWE neighbours (AT, NL, BE, FR)** are highly correlated with DE-LU. Buying transmission rights into these zones provides limited price diversification — prices move together. The primary value of CWE interconnection is **physical delivery optionality**, not price hedging.
+
+- **Nordic zones (NO, SE, FI)** show lower correlation, meaning interconnector capacity to the Nordics offers genuine **portfolio diversification**. However, this is constrained by physical capacity and allocation mechanisms under the FCA framework.
+
+- **Seasonal variation** in correlation means the diversification benefit itself is not constant. A hedging strategy that relies on Nordic decorrelation in summer may find that correlation tightens in winter when the entire continent faces cold weather simultaneously.
+
+::: {.callout-important}
+## The policy punchline
+
+Forward capacity allocation isn't just a grid operations question — it's a risk management tool. The FCA framework directly affects whether renewable generators can access the cross-border diversification that our correlation analysis shows exists in the Nordics. Market participants bidding for long-term transmission rights should account for the seasonal correlation structure documented here.
+:::
+
+
+# 7.0 Technical Notes {#sec-appendix}
+
+## 7.1 Simulation Convergence {#sec-convergence}
+
+Are `r comma(params$n_sim)` simulations enough for stable risk estimates? The plot below shows how CVaR 95% stabilises as the number of draws increases.
+
+```{r}
+#| label: fig-convergence-check
+#| fig-cap: "CVaR 95% converges well before the full simulation count"
+#| fig-height: 5
+
+# ── Convergence check: compute running CVaR ──────────────────────────
+winter_rev <- sim_results |>
+  filter(season == "Winter") |>
+  arrange(sim_id) |>
+  pull(monthly_rev_b)
+
+# Compute CVaR at increasing sample sizes (every 50 draws)
+check_points <- seq(200, length(winter_rev), by = 50)
+
+convergence <- tibble(
+  running_n    = check_points,
+  running_cvar = map_dbl(check_points, \(n) {
+    compute_cvar(winter_rev[1:n], 0.95) / 1e6
+  })
+)
+
+ggplot(convergence, aes(x = running_n, y = running_cvar)) +
+  geom_line(colour = "#4393C3", linewidth = 0.5) +
+  geom_hline(
+    yintercept = compute_cvar(
+      sim_results |> filter(season == "Winter") |> pull(monthly_rev_b),
+      0.95
+    ) / 1e6,
+    linetype = "dashed", colour = "#B2182B"
+  ) +
+  labs(
+    title    = "Simulation Convergence — Winter CVaR 95%",
+    subtitle = "The red dashed line shows the final estimate; convergence is reached well before 10,000 draws",
+    x = "Number of Simulations",
+    y = "Running CVaR 95% (M EUR)"
+  )
+```
+
+## 7.2 Assumptions & Limitations
+
+This analysis makes several deliberate simplifications:
+
+- **Fully unhedged portfolio.** In practice, most generators hedge 60–90% of expected output via forward contracts or PPAs. The unhedged case represents the maximum spot exposure — the risk baseline against which any hedging strategy is measured.
+- **No balancing costs, grid fees, or curtailment.** Real net revenue is lower than price × generation.
+- **No outages or maintenance.** Generation is modelled as purely weather-driven via the Stage 1 capacity factor models.
+- **Single technology, single zone.** Real portfolios diversify across technologies and geographies — exactly the kind of diversification our cross-zone analysis quantifies.
+- **Historical resampling assumes stationarity.** The simulation draws from 2020–2025 data, which includes the 2022 energy crisis. Risk metrics reflect this full historical range; a forward-looking view might exclude or down-weight the crisis period.
+- **Price model is linear (elastic net).** Extreme prices driven by scarcity events or negative pricing during high-wind periods may be underrepresented. The XGBoost benchmark in Stage 2 captures these non-linearities better but was not used here for interpretability.
+
+## 7.3 Data Sources
+
+- **SMARD (Bundesnetzagentur):** DE-LU generation, load, and day-ahead price. [SMARD.de](https://www.smard.de/), CC BY 4.0.
+- **ENTSO-E Transparency Platform:** Multi-zone prices, cross-border flows, and generation by type. Used per ENTSO-E terms of service.
+- **Copernicus ERA5 Reanalysis:** Hourly wind speed and solar irradiance. Hersbach et al. (2020), doi:[10.24381/cds.adbb2d47](https://doi.org/10.24381/cds.adbb2d47).
+- **Yahoo Finance:** TTF natural gas front-month futures (ICE Dutch TTF, EUR/MWh).
