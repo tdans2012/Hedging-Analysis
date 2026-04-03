@@ -75,14 +75,9 @@ PRICE_ZONES = [
 ]
 
 # Generation queries — subset of zones (most relevant for the analysis)
-GENERATION_ZONES = [
-    "FR",
-    "NL",
-    "BE",
-    "AT",
-    "DK_1",
-    "DK_2",
-]
+GENERATION_ZONES = ["DK_1", "DK_2", "FR", "NL", "BE", "AT",
+                    "NO_1", "NO_2", "NO_3", "NO_4", "NO_5",
+                    "SE_1", "SE_2", "SE_3", "SE_4", "FI"]
 
 # Cross-border flow pairs (from, to) — DE-LU borders
 FLOW_PAIRS = [
