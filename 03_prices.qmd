@@ -58,7 +58,7 @@ smard <- read_parquet("data/processed/smard/smard_DE-LU_2020_2025.parquet")
 cat(
   "SMARD rows:", nrow(smard), "\n",
   "Range:", as.character(min(smard$datetime_utc)),
-  "–", as.character(max(smard$datetime_utc)), "\n",
+  "to", as.character(max(smard$datetime_utc)), "\n",
   "Columns:", paste(names(smard), collapse = ", ")
 )
 ```
@@ -113,7 +113,7 @@ if (!file.exists(ttf_path)) {
 
 cat(
   "Range:", as.character(min(ttf_daily$date)),
-  "–", as.character(max(ttf_daily$date)), "\n",
+  "to", as.character(max(ttf_daily$date)), "\n",
   "TTF min:", round(min(ttf_daily$ttf_eur_mwh), 1),
   "| max:", round(max(ttf_daily$ttf_eur_mwh), 1), "EUR/MWh"
 )
@@ -128,7 +128,7 @@ Before constructing any features, we inspect the raw price series, its distribut
 
 ```{r}
 #| label: fig-price-ts
-#| fig-cap: "DE-LU day-ahead price, hourly. LOESS trend highlights the 2021–22 energy crisis and subsequent normalisation."
+#| fig-cap: "DE-LU day-ahead price, hourly. LOESS trend highlights the 2021-22 energy crisis and subsequent normalisation."
 
 smard |>
   ggplot(aes(datetime_utc, price_de_lu)) +
@@ -157,7 +157,44 @@ smard |>
   scale_colour_brewer(palette = "Set2")
 ```
 
-## 3.3 Seasonal Heatmap (Hour × Day-of-Week)
+## 3.3 Negative Prices
+
+```{r}
+#| label: tbl-negative-prices
+#| tbl-cap: "Negative price events by year. These reflect renewable oversupply and conventional inflexibility."
+
+smard |>
+  mutate(year = year(datetime_utc)) |>
+  summarise(
+    n_negative = sum(price_de_lu < 0, na.rm = TRUE),
+    pct_negative = mean(price_de_lu < 0, na.rm = TRUE),
+    min_price = min(price_de_lu, na.rm = TRUE),
+    .by = year
+  ) |>
+  mutate(pct_negative = scales::percent(pct_negative, accuracy = 0.1)) |>
+  knitr::kable(col.names = c("Year", "Negative hours", "% Negative", "Min EUR/MWh"),
+               digits = 1)
+```
+
+```{r}
+#| label: fig-negative-ts
+#| fig-cap: "Negative price events coloured by magnitude. Most cluster in midday hours during high-solar periods."
+
+smard |>
+  filter(price_de_lu < 0) |>
+  ggplot(aes(datetime_utc, price_de_lu, colour = price_de_lu)) +
+  geom_point(size = 0.8, alpha = 0.7) +
+  scale_colour_viridis_c(option = "plasma", direction = -1, name = "EUR/MWh") +
+  labs(title = "Negative Price Events — DE-LU",
+       x = NULL, y = "EUR/MWh") +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50")
+```
+
+::: {.callout-note title="Why Negative Prices Matter"}
+Negative prices reflect the inflexibility cost of conventional generation. When renewable output exceeds demand, thermal plants that cannot ramp down quickly (lignite, nuclear, combined heat-and-power under must-run obligations) effectively pay to remain connected. For a renewable generator without a power purchase agreement, these hours represent direct revenue losses. Negative prices are preserved in the model — they are not excluded or transformed away, because they represent a structurally important feature of electricity markets that any hedging strategy must account for.
+:::
+
+## 3.4 Seasonal Heatmap (Hour x Day-of-Week)
 
 ```{r}
 #| label: fig-heatmap-raw
@@ -182,11 +219,11 @@ smard |>
   facet_wrap(~ season) +
   scale_fill_viridis_c(option = "inferno", name = "EUR/MWh") +
   scale_x_continuous(breaks = seq(0, 23, 3)) +
-  labs(title = "Average Price Heatmap — Hour × Day-of-Week × Season",
+  labs(title = "Average Price Heatmap — Hour x Day-of-Week x Season",
        x = "Hour (UTC)", y = NULL)
 ```
 
-## 3.4 Price vs Gas-Fired Generation
+## 3.5 Price vs Gas-Fired Generation
 
 ```{r}
 #| label: fig-price-gas
@@ -201,7 +238,7 @@ smard |>
   coord_cartesian(ylim = c(-50, 400))
 ```
 
-## 3.5 TTF Gas Price
+## 3.6 TTF Gas Price
 
 ```{r}
 #| label: fig-ttf-ts
@@ -218,7 +255,7 @@ ttf_daily |>
 # 4.0 Feature Engineering {#sec-features}
 
 We construct the variables that enter the price regression. Each captures a distinct channel through which supply and demand shape the clearing price:
-  
+
 - **Renewable share** — wind + solar as a fraction of total load. A merit-order shifter: higher renewable share pushes expensive thermal plants off the stack.
 - **Residual load** — total load minus renewable generation. The demand that must be met by dispatchable (mostly thermal) capacity.
 - **Net export balance** — total physical exports minus imports across DE-LU borders. Positive = Germany is a net exporter (tightens domestic supply).
@@ -379,7 +416,7 @@ price_df |>
 
 ```{r}
 #| label: fig-corr-matrix
-#| fig-cap: "Correlation among model features. Renewable share and residual load are strongly negatively correlated by construction — this is expected and handled in the regression."
+#| fig-cap: "Correlation among model features. Renewable share and residual load are strongly negatively correlated by construction — this is expected and handled by the lasso."
 
 cor_vars <- price_df |>
   select(price_de_lu, renewable_share, residual_load, net_export_mw, ttf_eur_mwh)
@@ -419,10 +456,10 @@ test_df  <- price_df |> filter(datetime_utc >= split_date)
 
 cat(
   "Train:", nrow(train_df), "rows |",
-  as.character(min(train_df$datetime_utc)), "–",
+  as.character(min(train_df$datetime_utc)), "to",
   as.character(max(train_df$datetime_utc)), "\n",
   "Test: ", nrow(test_df), "rows |",
-  as.character(min(test_df$datetime_utc)), "–",
+  as.character(min(test_df$datetime_utc)), "to",
   as.character(max(test_df$datetime_utc))
 )
 ```
@@ -435,10 +472,8 @@ Before fitting the price model, we check the standard regression assumptions aga
 ```{r}
 #| label: diagnostics-ols-prelim
 
-# Preliminary OLS for diagnostics only
 diag_fml <- price_de_lu ~ renewable_share + residual_load + net_export_mw +
   ttf_eur_mwh + season + dow + hour
-
 diag_fit <- lm(diag_fml, data = train_df)
 ```
 
@@ -446,7 +481,7 @@ diag_fit <- lm(diag_fml, data = train_df)
 
 ```{r}
 #| label: tbl-vif
-#| tbl-cap: "Generalised VIF for each predictor. Values above 5–10 indicate collinearity concerns that motivate regularisation."
+#| tbl-cap: "Generalised VIF for each predictor. Values above 5-10 indicate collinearity concerns that motivate regularisation."
 
 car::vif(diag_fit) |>
   as.data.frame() |>
@@ -462,12 +497,9 @@ car::vif(diag_fit) |>
 
 ```{r}
 #| label: fig-resid-fitted
-#| fig-cap: "Residual variance increases with fitted value — clear heteroskedasticity. This motivates HC-robust standard errors for valid inference."
+#| fig-cap: "Residual variance increases with fitted value — clear heteroskedasticity. This is a structural feature of electricity markets: gas-fired marginal pricing produces multiplicative price responses."
 
-tibble(
-  fitted   = fitted(diag_fit),
-  residual = residuals(diag_fit)
-) |>
+tibble(fitted = fitted(diag_fit), residual = residuals(diag_fit)) |>
   ggplot(aes(fitted, residual)) +
   geom_hex(bins = 80) +
   geom_hline(yintercept = 0, linetype = "dashed") +
@@ -502,16 +534,16 @@ cat(
   "p-value:", format.pval(bp_test$p.value, digits = 3), "\n\n"
 )
 if (bp_test$p.value < 0.05) {
-  cat("Result: heteroskedasticity detected (p < 0.05).",
-      "HC-robust standard errors will be used for inference.\n")
+  cat("Result: heteroskedasticity detected (p < 0.05).\n",
+      "This is expected for electricity prices and handled with HC-robust standard errors.\n")
 }
 ```
 
 ::: {.callout-note title="Diagnostic Summary"}
-The diagnostics reveal two standard issues for electricity price data:
+The diagnostics reveal two features typical of electricity price data:
 
-1. **Multicollinearity** between renewable share and residual load (mechanically linked via total load). An **elastic net** penalty addresses this by shrinking unstable coefficients.
-2. **Heteroskedasticity** — residual variance scales with price level, and extreme events produce heavy tails. The coefficient estimates remain consistent, but **HC-robust standard errors** (sandwich estimator) are needed for valid inference.
+1. **Multicollinearity** between renewable share and residual load (mechanically linked via total load). A **lasso** penalty addresses this by zeroing out redundant terms.
+2. **Heteroskedasticity** — residual variance scales with price level. This is a structural feature of electricity markets, not a model failure. **HC-robust standard errors** (sandwich estimator) ensure valid inference. The model operates in raw EUR/MWh for full interpretability.
 
 These findings motivate the modelling choices in the next section.
 :::
@@ -519,20 +551,21 @@ These findings motivate the modelling choices in the next section.
 
 # 8.0 Price Regression {#sec-regression}
 
-We fit two models and compare them via rolling-window cross-validation:
+We fit three models and compare them via rolling-window cross-validation:
 
-1. **Elastic net with interactions** — interpretable, coefficient-based. Regularisation handles multicollinearity (renewable share ↔ residual load) and performs implicit feature selection. All numeric predictors are normalised so coefficients read as "EUR/MWh effect per 1-SD change."
-2. **Boosted tree (XGBoost)** — flexible, non-parametric. Captures non-linearities and higher-order interactions the elastic net cannot.
+1. **Lasso with interactions** — interpretable, coefficient-based. The L1 penalty produces a sparse model by zeroing out redundant terms. All numeric predictors are normalised so coefficients read as EUR/MWh per 1-SD change.
+2. **Boosted tree (XGBoost, mean)** — flexible, non-parametric benchmark. Captures non-linearities and higher-order interactions the lasso cannot.
+3. **Quantile XGBoost (q5, q50, q95)** — targets specific percentiles, producing a 90% prediction interval that captures tail events the mean models miss. Feeds directly into the Stage 3 VaR/CVaR framework.
 
-Both use the same feature set. The elastic net is the primary model for the variance decomposition; the boosted tree is a performance benchmark.
+The lasso is the primary model for the variance decomposition; the boosted trees serve as performance benchmarks and provide distributional predictions for risk analysis.
 
 ## 8.1 Feature Recipes
 
 ```{r}
 #| label: recipes
 
-# --- Elastic net recipe: cyclical encoding, interactions, normalisation ---
-enet_recipe <- recipe(
+# --- Lasso recipe: cyclical encoding, interactions, normalisation ---
+lasso_recipe <- recipe(
   price_de_lu ~ renewable_share + residual_load + net_export_mw +
     ttf_eur_mwh + season + dow + hour,
   data = train_df
@@ -563,9 +596,10 @@ xgb_recipe <- recipe(
 ```{r}
 #| label: model-specs
 
-enet_spec <- linear_reg(
+# Pure lasso: mixture = 1 (L1 only), only tune penalty
+lasso_spec <- linear_reg(
   penalty = tune(),
-  mixture = tune()
+  mixture = 1
 ) |>
   set_engine("glmnet") |>
   set_mode("regression")
@@ -579,8 +613,25 @@ xgb_spec <- boost_tree(
   set_engine("xgboost") |>
   set_mode("regression")
 
-enet_wf <- workflow() |> add_recipe(enet_recipe) |> add_model(enet_spec)
-xgb_wf  <- workflow() |> add_recipe(xgb_recipe) |> add_model(xgb_spec)
+# Quantile XGBoost for tail risk
+xgb_q05_spec <- boost_tree(trees = 500, tree_depth = 6, learn_rate = 0.05, min_n = 20) |>
+  set_engine("xgboost", objective = "reg:quantileerror", quantile_alpha = 0.05) |>
+  set_mode("regression")
+
+xgb_q50_spec <- boost_tree(trees = 500, tree_depth = 6, learn_rate = 0.05, min_n = 20) |>
+  set_engine("xgboost", objective = "reg:quantileerror", quantile_alpha = 0.50) |>
+  set_mode("regression")
+
+xgb_q95_spec <- boost_tree(trees = 500, tree_depth = 6, learn_rate = 0.05, min_n = 20) |>
+  set_engine("xgboost", objective = "reg:quantileerror", quantile_alpha = 0.95) |>
+  set_mode("regression")
+
+lasso_wf <- workflow() |> add_recipe(lasso_recipe) |> add_model(lasso_spec)
+xgb_wf   <- workflow() |> add_recipe(xgb_recipe)  |> add_model(xgb_spec)
+
+xgb_q05_wf <- workflow() |> add_recipe(xgb_recipe) |> add_model(xgb_q05_spec)
+xgb_q50_wf <- workflow() |> add_recipe(xgb_recipe) |> add_model(xgb_q50_spec)
+xgb_q95_wf <- workflow() |> add_recipe(xgb_recipe) |> add_model(xgb_q95_spec)
 ```
 
 ## 8.3 Rolling-Window Cross-Validation
@@ -590,9 +641,9 @@ xgb_wf  <- workflow() |> add_recipe(xgb_recipe) |> add_model(xgb_spec)
 
 rolling_splits <- rolling_origin(
   train_df,
-  initial  = 365 * 24,   # 1-year training window
-  assess   = 30 * 24,     # 1-month evaluation window
-  skip     = 30 * 24,     # slide by 1 month
+  initial  = 365 * 24,
+  assess   = 30 * 24,
+  skip     = 30 * 24,
   cumulative = FALSE
 )
 
@@ -605,44 +656,39 @@ cat("Rolling CV folds:", nrow(rolling_splits))
 
 cv_metrics <- metric_set(rmse, mae, rsq)
 
-# --- Tune elastic net penalty and mixture over a grid ---
-enet_grid <- grid_regular(
-  penalty(range = c(-4, 0)),    # 10^-4 to 10^0
-  mixture(range = c(0, 1)),     # 0 = ridge, 1 = lasso
-  levels = c(penalty = 10, mixture = 5)
-)
+# --- Tune lasso penalty ---
+lasso_grid <- grid_regular(penalty(range = c(-2, 1)), levels = 20)
 
-enet_tune <- tune_grid(
-  enet_wf,
+lasso_tune <- tune_grid(
+  lasso_wf,
   resamples = rolling_splits,
-  grid      = enet_grid,
+  grid      = lasso_grid,
   metrics   = cv_metrics
 )
 
-# --- XGBoost: no tuning (fixed hyperparams) ---
+# --- XGBoost (mean): no tuning ---
 xgb_cv <- fit_resamples(xgb_wf, resamples = rolling_splits, metrics = cv_metrics)
 
-# --- Select best elastic net parameters ---
-best_enet <- select_best(enet_tune, metric = "rmse")
-cat("\nBest elastic net params:\n")
-print(best_enet)
+# --- Select best lasso penalty ---
+best_lasso <- select_best(lasso_tune, metric = "rmse")
+cat("\nBest lasso penalty:", best_lasso$penalty, "\n")
 
-enet_wf_final <- finalize_workflow(enet_wf, best_enet)
+lasso_wf_final <- finalize_workflow(lasso_wf, best_lasso)
 ```
 
 ```{r}
 #| label: tbl-cv-results
-#| tbl-cap: "Rolling CV performance. The elastic net results are for the best-tuned penalty and mixture."
+#| tbl-cap: "Rolling CV performance (EUR/MWh)."
 
 bind_rows(
-  collect_metrics(enet_tune) |>
-    semi_join(best_enet, by = c("penalty", "mixture")) |>
-    mutate(model = "Elastic Net"),
+  collect_metrics(lasso_tune) |>
+    semi_join(best_lasso, by = "penalty") |>
+    mutate(model = "Lasso"),
   collect_metrics(xgb_cv) |> mutate(model = "XGBoost")
 ) |>
   select(model, .metric, mean, std_err) |>
   pivot_wider(names_from = .metric, values_from = c(mean, std_err)) |>
-  knitr::kable(digits = 2, caption = "Rolling CV Performance (training period)")
+  knitr::kable(digits = 2)
 ```
 
 ## 8.4 Fit on Full Training Set & Test Evaluation
@@ -651,56 +697,107 @@ bind_rows(
 #| label: final-fit
 #| cache: true
 
-enet_fit <- fit(enet_wf_final, data = train_df)
-xgb_fit  <- fit(xgb_wf, data = train_df)
+lasso_fit <- fit(lasso_wf_final, data = train_df)
+xgb_fit   <- fit(xgb_wf, data = train_df)
 
-# Test-set predictions
+# Quantile XGBoost fits
+xgb_q05_fit <- fit(xgb_q05_wf, data = train_df)
+xgb_q50_fit <- fit(xgb_q50_wf, data = train_df)
+xgb_q95_fit <- fit(xgb_q95_wf, data = train_df)
+
+# Test-set predictions (all EUR/MWh)
 test_preds <- test_df |>
   select(datetime_utc, price_de_lu, season) |>
   mutate(
-    pred_enet = predict(enet_fit, new_data = test_df)$.pred,
-    pred_xgb  = predict(xgb_fit, new_data = test_df)$.pred
+    pred_lasso = predict(lasso_fit, new_data = test_df)$.pred,
+    pred_xgb   = predict(xgb_fit, new_data = test_df)$.pred,
+    pred_q05   = predict(xgb_q05_fit, new_data = test_df)$.pred,
+    pred_q50   = predict(xgb_q50_fit, new_data = test_df)$.pred,
+    pred_q95   = predict(xgb_q95_fit, new_data = test_df)$.pred
   )
 
 bind_rows(
-  test_preds |> metrics(truth = price_de_lu, estimate = pred_enet) |> mutate(model = "Elastic Net"),
-  test_preds |> metrics(truth = price_de_lu, estimate = pred_xgb) |> mutate(model = "XGBoost")
+  test_preds |> metrics(truth = price_de_lu, estimate = pred_lasso) |> mutate(model = "Lasso"),
+  test_preds |> metrics(truth = price_de_lu, estimate = pred_xgb) |> mutate(model = "XGBoost (mean)"),
+  test_preds |> metrics(truth = price_de_lu, estimate = pred_q50) |> mutate(model = "XGBoost (median)")
 ) |>
   select(model, .metric, .estimate) |>
   pivot_wider(names_from = .metric, values_from = .estimate) |>
-  knitr::kable(digits = 2, caption = "Test-Set Performance")
+  knitr::kable(digits = 2, caption = "Test-Set Performance (EUR/MWh)")
 ```
 
 ## 8.5 Actual vs Predicted
 
 ```{r}
 #| label: fig-actual-pred
-#| fig-cap: "Actual vs predicted prices on the test set. The 45° line indicates perfect prediction."
+#| fig-cap: "Actual vs predicted prices on the test set (EUR/MWh)."
 
 test_preds |>
-  pivot_longer(cols = starts_with("pred_"), names_to = "model",
+  pivot_longer(cols = c(pred_lasso, pred_xgb), names_to = "model",
                values_to = "predicted", names_prefix = "pred_") |>
-  mutate(model = case_match(model, "enet" ~ "Elastic Net", "xgb" ~ "XGBoost")) |>
+  mutate(model = case_match(model, "lasso" ~ "Lasso", "xgb" ~ "XGBoost (mean)")) |>
   ggplot(aes(predicted, price_de_lu)) +
   geom_hex(bins = 60) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", colour = "#E63946") +
   facet_wrap(~ model) +
   scale_fill_viridis_c(option = "mako", trans = "log10", name = "Count") +
   coord_cartesian(xlim = c(-50, 300), ylim = c(-50, 300)) +
-  labs(title = "Actual vs Predicted — Test Set",
+  labs(title = "Actual vs Predicted — Test Set (EUR/MWh)",
        x = "Predicted (EUR/MWh)", y = "Actual (EUR/MWh)")
+```
+
+## 8.5.1 Quantile Prediction Intervals
+
+The mean-regression models compress predictions toward the centre. The quantile XGBoost models directly target the 5th and 95th percentiles, producing a 90% prediction interval that captures tail events.
+
+```{r}
+#| label: fig-quantile-interval
+#| fig-cap: "Quantile XGBoost prediction intervals (90%) on the test set. The q5-q95 band brackets extreme price events that the mean models miss."
+
+set.seed(42)
+interval_sample <- test_preds |>
+  arrange(pred_q50) |>
+  mutate(idx = row_number()) |>
+  slice_sample(n = 3000) |>
+  arrange(idx)
+
+interval_sample |>
+  ggplot(aes(x = idx)) +
+  geom_ribbon(aes(ymin = pred_q05, ymax = pred_q95), fill = "#457B9D", alpha = 0.3) +
+  geom_line(aes(y = pred_q50), colour = "#457B9D", linewidth = 0.4) +
+  geom_point(aes(y = price_de_lu), size = 0.3, alpha = 0.4, colour = "grey30") +
+  labs(
+    title = "90% Prediction Interval — Quantile XGBoost (EUR/MWh)",
+    subtitle = "Blue band = q5-q95; line = median; points = actual prices",
+    x = "Observations (sorted by predicted median)", y = "EUR/MWh"
+  )
+```
+
+```{r}
+#| label: tbl-quantile-coverage
+#| tbl-cap: "Empirical coverage of the 90% prediction interval by season. Ideal coverage is 90%."
+
+test_preds |>
+  mutate(covered = price_de_lu >= pred_q05 & price_de_lu <= pred_q95) |>
+  summarise(n_obs = n(), coverage = mean(covered), .by = season) |>
+  add_row(
+    season = "Overall", n_obs = nrow(test_preds),
+    coverage = mean(test_preds$price_de_lu >= test_preds$pred_q05 &
+                    test_preds$price_de_lu <= test_preds$pred_q95)
+  ) |>
+  mutate(coverage = scales::percent(coverage, accuracy = 0.1)) |>
+  knitr::kable()
 ```
 
 ## 8.6 Residual Time Series
 
 ```{r}
 #| label: fig-residuals-ts
-#| fig-cap: "Daily mean elastic net residuals across the full dataset (train + test). The ribbon shows ±1 SD. The 2022 energy crisis and late-2025 volatility are the most prominent model misses."
+#| fig-cap: "Daily mean lasso residuals (EUR/MWh) across the full dataset. The ribbon shows plus/minus 1 SD. The vertical line marks the train/test boundary."
 
-# Predict on full dataset, aggregate to daily
 full_resid <- price_df |>
   mutate(
-    pred    = predict(enet_fit, new_data = price_df)$.pred,
+    pred     = predict(lasso_fit, new_data = price_df)$.pred,
     residual = price_de_lu - pred,
     date     = as_date(datetime_utc),
     split    = if_else(datetime_utc < split_date, "Train", "Test")
@@ -721,60 +818,83 @@ full_resid |>
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_vline(xintercept = as_date(split_date), linetype = "dotted",
              colour = "#E63946", linewidth = 0.5) +
-  annotate("text", x = as_date(split_date), y = max(full_resid$mean_resid + full_resid$sd_resid, na.rm = TRUE) * 0.9,
+  annotate("text", x = as_date(split_date),
+           y = max(full_resid$mean_resid + full_resid$sd_resid, na.rm = TRUE) * 0.9,
            label = "Train / Test split", hjust = -0.05, colour = "#E63946", size = 3.5) +
-  labs(title = "Daily Mean Residual — Elastic Net (Full Dataset)",
-       subtitle = "Ribbon = ±1 SD of hourly residuals within each day",
+  labs(title = "Daily Mean Residual — Lasso (Full Dataset)",
+       subtitle = "Ribbon = +/- 1 SD of hourly residuals within each day",
        x = NULL, y = "Residual (EUR/MWh)")
 ```
 
-## 8.7 Elastic Net Coefficients
+## 8.7 Lasso Coefficients
 
-The elastic net coefficients are on normalised features — each represents the EUR/MWh price change per 1-SD shift in that predictor, making effect sizes directly comparable across features with very different native scales.
+The lasso zeroes out redundant terms, producing a sparse coefficient set. All numeric predictors are normalised, so each coefficient represents the EUR/MWh price change per 1-SD shift in that predictor — effect sizes are directly comparable across features. Only the top 20 non-zero coefficients are shown.
 
 ```{r}
-#| label: tbl-enet-coefs
-#| tbl-cap: "Elastic net coefficients (normalised scale). Each value represents the EUR/MWh effect of a 1-SD change in the predictor. Zero coefficients have been shrunk out by the L1 penalty."
+#| label: tbl-lasso-coefs
+#| tbl-cap: "Top 20 non-zero lasso coefficients (normalised scale, EUR/MWh per 1-SD change). Sorted by absolute magnitude."
 
-enet_fit |>
-  extract_fit_engine() |>
-  broom::tidy() |>
-  filter(estimate != 0) |>
+lasso_engine <- extract_fit_engine(lasso_fit)
+
+lasso_coefs <- coef(lasso_engine, s = best_lasso$penalty) |>
+  as.matrix() |>
+  as.data.frame() |>
+  rownames_to_column("term") |>
+  rename(estimate = 2) |>
+  filter(abs(estimate) > 0, term != "(Intercept)") |>
   mutate(
     term = str_replace_all(term, "_", " "),
-    estimate = round(estimate, 3)
+    estimate = round(estimate, 2)
   ) |>
-  select(term, estimate) |>
-  arrange(desc(abs(estimate))) |>
+  arrange(desc(abs(estimate)))
+
+cat("Total non-zero coefficients:", nrow(lasso_coefs), "\n\n")
+
+lasso_coefs |>
+  slice_head(n = 20) |>
   knitr::kable()
 ```
 
 ## 8.8 OLS with HC-Robust Standard Errors
 
-For valid statistical inference under heteroskedasticity, we refit OLS on the same normalised features and report HC3-robust standard errors via the sandwich estimator.
+For valid statistical inference under heteroskedasticity, we refit OLS using **only the predictors selected by the lasso** (non-zero coefficients) and report HC3-robust standard errors. This two-stage approach — lasso for feature selection, OLS for inference — is a standard econometric pipeline.
 
 ```{r}
 #| label: tbl-robust-coefs
-#| tbl-cap: "OLS coefficients with HC3-robust standard errors. Inference is valid under heteroskedasticity. Coefficients are on the normalised scale (EUR/MWh per 1-SD change)."
+#| tbl-cap: "OLS coefficients with HC3-robust standard errors on the lasso-selected features (EUR/MWh per 1-SD change)."
 
-# Bake training data through the elastic net recipe to get normalised features
-enet_baked_train <- enet_recipe |>
-  prep(training = train_df) |>
-  bake(new_data = train_df)
+lasso_prep <- lasso_recipe |> prep(training = train_df)
+lasso_baked_train <- bake(lasso_prep, new_data = train_df)
 
-# Refit OLS on normalised features
-ols_robust_fit <- lm(price_de_lu ~ ., data = enet_baked_train)
+# Extract lasso-selected terms (non-zero at best penalty)
+selected_terms <- coef(lasso_engine, s = best_lasso$penalty) |>
+  as.matrix() |>
+  as.data.frame() |>
+  rownames_to_column("term") |>
+  rename(estimate = 2) |>
+  filter(abs(estimate) > 0, term != "(Intercept)") |>
+  pull(term)
+
+cat("Lasso selected", length(selected_terms), "of",
+    ncol(lasso_baked_train) - 1, "candidate features\n\n")
+
+# Refit OLS on selected features only
+ols_data <- lasso_baked_train |> select(price_de_lu, all_of(selected_terms))
+ols_robust_fit <- lm(price_de_lu ~ ., data = ols_data)
 
 # HC3-robust inference
 robust_coefs <- lmtest::coeftest(ols_robust_fit, vcov. = sandwich::vcovHC(ols_robust_fit, type = "HC3"))
 
 robust_coefs |>
   broom::tidy() |>
+  filter(term != "(Intercept)") |>
   mutate(
     term = str_replace_all(term, "_", " "),
-    across(c(estimate, std.error, statistic), ~ round(., 3)),
+    across(c(estimate, std.error, statistic), ~ round(., 2)),
     p.value = scales::pvalue(p.value)
   ) |>
+  arrange(desc(abs(estimate))) |>
+  slice_head(n = 20) |>
   knitr::kable()
 ```
 
@@ -783,61 +903,66 @@ robust_coefs |>
 
 This is the centrepiece exhibit. We quantify how much of day-ahead price variance each driver explains, and show how the attribution shifts by season.
 
-## 9.1 Partial R² by Season
+The decomposition is presented in two panels. First, the **full sample (2020-2025)** provides context: the 2021-22 gas crisis dominates overall variance, with TTF swamping all other drivers. Second, the **post-crisis subset (2023-2025)** isolates the stable gas-price regime where renewable variability, residual load, and temporal patterns emerge as the primary merit-order drivers. This second panel reflects the market environment a hedging desk faces today.
 
-For each season, we fit the full OLS model and then re-fit it with each feature group removed. The drop in R² measures that group's unique contribution to explaining price variance. Because we fit separately per season, hour-of-day coefficients are free to vary across seasons — this is equivalent to the hour × season interaction used in the pooled model above.
+## 9.1 Full Sample — Partial R-squared by Season
 
 ```{r}
-#| label: partial-r2
+#| label: partial-r2-full
 #| cache: true
 
-# Prepare model matrix with explicit features (base lm for clean formula manipulation)
-model_df <- price_df |>
-  mutate(
-    hour_sin_24 = sin(2 * pi * hour / 24),
-    hour_cos_24 = cos(2 * pi * hour / 24),
-    hour_sin_12 = sin(4 * pi * hour / 24),
-    hour_cos_12 = cos(4 * pi * hour / 24)
+# Helper function for partial R-squared decomposition
+compute_partial_r2 <- function(df, response = "price_de_lu") {
+
+  df <- df |>
+    mutate(
+      hour_sin_24 = sin(2 * pi * hour / 24),
+      hour_cos_24 = cos(2 * pi * hour / 24),
+      hour_sin_12 = sin(4 * pi * hour / 24),
+      hour_cos_12 = cos(4 * pi * hour / 24)
+    )
+
+  full_fml <- reformulate(
+    c("renewable_share", "residual_load", "net_export_mw", "ttf_eur_mwh",
+      "dow", "hour_sin_24", "hour_cos_24", "hour_sin_12", "hour_cos_12"),
+    response = response
   )
 
-# Full formula (within season, so no season term needed)
-full_fml <- price_de_lu ~ renewable_share + residual_load + net_export_mw +
-  ttf_eur_mwh + dow + hour_sin_24 + hour_cos_24 + hour_sin_12 + hour_cos_12
+  feature_groups <- list(
+    "Renewable share" = "renewable_share",
+    "Residual load"   = "residual_load",
+    "Net exports"     = "net_export_mw",
+    "Gas price (TTF)" = "ttf_eur_mwh",
+    "Temporal (hour + dow)" = c("dow", "hour_sin_24", "hour_cos_24",
+                                 "hour_sin_12", "hour_cos_12")
+  )
 
-# Feature groups to drop (each entry is a character vector of terms)
-feature_groups <- list(
-  "Renewable share" = "renewable_share",
-  "Residual load"   = "residual_load",
-  "Net exports"     = "net_export_mw",
-  "Gas price (TTF)" = "ttf_eur_mwh",
-  "Temporal (hour + dow)" = c("dow", "hour_sin_24", "hour_cos_24",
-                               "hour_sin_12", "hour_cos_12")
-)
+  map_dfr(levels(df$season), function(s) {
+    df_s <- df |> filter(season == s)
+    full_fit <- lm(full_fml, data = df_s)
+    full_r2  <- summary(full_fit)$r.squared
 
-partial_r2 <- map_dfr(levels(model_df$season), function(s) {
-  df_s <- model_df |> filter(season == s)
-  full_fit <- lm(full_fml, data = df_s)
-  full_r2  <- summary(full_fit)$r.squared
+    map_dfr(names(feature_groups), function(g) {
+      drop_terms <- feature_groups[[g]]
+      keep_terms <- setdiff(attr(terms(full_fml), "term.labels"), drop_terms)
+      reduced_fml <- reformulate(keep_terms, response = response)
+      reduced_r2  <- summary(lm(reduced_fml, data = df_s))$r.squared
+      tibble(season = s, component = g, partial_r2 = full_r2 - reduced_r2)
+    }) |>
+      add_row(season = s, component = "Full model R-sq", partial_r2 = full_r2)
+  })
+}
 
-  map_dfr(names(feature_groups), function(g) {
-    drop_terms <- feature_groups[[g]]
-    keep_terms <- setdiff(attr(terms(full_fml), "term.labels"), drop_terms)
-    reduced_fml <- reformulate(keep_terms, response = "price_de_lu")
-    reduced_r2  <- summary(lm(reduced_fml, data = df_s))$r.squared
-
-    tibble(season = s, component = g, partial_r2 = full_r2 - reduced_r2)
-  }) |>
-    add_row(season = s, component = "Full model R²", partial_r2 = full_r2)
-})
+partial_r2_full <- compute_partial_r2(price_df)
 ```
 
 ```{r}
-#| label: fig-partial-r2
-#| fig-cap: "Partial R² by season. Each bar shows how much R² is lost when that feature group is removed from the model. Renewable share dominates in summer; gas price dominates in winter."
+#| label: fig-partial-r2-full
+#| fig-cap: "Full sample (2020-2025): TTF gas price dominates variance in all seasons. The 2021-22 energy crisis was the single largest source of price variance in the dataset."
 #| fig-height: 7
 
-partial_r2 |>
-  filter(component != "Full model R²") |>
+partial_r2_full |>
+  filter(component != "Full model R-sq") |>
   mutate(
     season    = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn")),
     component = fct_reorder(component, partial_r2, .fun = mean, .desc = TRUE)
@@ -849,50 +974,94 @@ partial_r2 |>
   scale_fill_brewer(palette = "Set2", guide = "none") +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
   labs(
-    title    = "Variance Attribution — Partial R² by Season",
-    subtitle = "Drop in model R² when each feature group is excluded",
-    x = NULL, y = "Partial R²"
+    title    = "Variance Attribution — Full Sample (2020-2025)",
+    subtitle = "Drop in model R-squared when each feature group is excluded",
+    x = NULL, y = "Partial R-squared"
+  )
+```
+
+## 9.2 Post-Crisis — Partial R-squared by Season
+
+With TTF stabilised in the 30-55 EUR/MWh range since mid-2022, the merit-order drivers that matter for forward-looking hedging become visible.
+
+```{r}
+#| label: partial-r2-post
+#| cache: true
+
+price_post <- price_df |> filter(datetime_utc >= as.POSIXct("2023-01-01", tz = "UTC"))
+cat("Post-crisis rows:", nrow(price_post), "\n")
+
+partial_r2_post <- compute_partial_r2(price_post)
+```
+
+```{r}
+#| label: fig-partial-r2-post
+#| fig-cap: "Post-crisis (2023-2025): with gas prices stabilised, renewable share and residual load emerge as the primary price drivers. The seasonal pattern is clear — renewables dominate summer, residual load dominates shoulder seasons."
+#| fig-height: 7
+
+partial_r2_post |>
+  filter(component != "Full model R-sq") |>
+  mutate(
+    season    = factor(season, levels = c("Winter", "Spring", "Summer", "Autumn")),
+    component = fct_reorder(component, partial_r2, .fun = mean, .desc = TRUE)
+  ) |>
+  ggplot(aes(component, partial_r2, fill = component)) +
+  geom_col(width = 0.7) +
+  facet_wrap(~ season) +
+  coord_flip() +
+  scale_fill_brewer(palette = "Set2", guide = "none") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(
+    title    = "Variance Attribution — Post-Crisis (2023-2025)",
+    subtitle = "Drop in model R-squared when each feature group is excluded",
+    x = NULL, y = "Partial R-squared"
   )
 ```
 
 ```{r}
-#| label: tbl-partial-r2
-#| tbl-cap: "Partial R² values and full model R² by season."
+#| label: tbl-partial-r2-both
+#| tbl-cap: "Partial R-squared comparison: full sample vs post-crisis, by season."
 
-partial_r2 |>
+bind_rows(
+  partial_r2_full |> mutate(period = "Full (2020-2025)"),
+  partial_r2_post |> mutate(period = "Post-crisis (2023-2025)")
+) |>
+  filter(component != "Full model R-sq") |>
   mutate(partial_r2 = round(partial_r2, 4)) |>
   pivot_wider(names_from = season, values_from = partial_r2) |>
+  arrange(period, desc(Winter)) |>
   knitr::kable()
 ```
 
-## 9.2 Shapley-Style Robustness Check (Permutation Importance)
+## 9.3 Permutation Importance (Robustness Check)
 
 As a robustness check, we compute permutation-based feature importance using the `iml` package. This approach is model-agnostic and doesn't depend on the sequential ordering of terms.
+
+::: {.callout-note title="Partial R-squared vs Permutation Importance"}
+Partial R-squared uses unpenalised OLS (fitted per season) for clean additive decomposition — it answers "how much variance is *associated with* each driver?" The permutation importance uses the fitted lasso — it answers "how much does *this specific model* rely on each feature?" If the two methods agree, that is strong evidence. If they diverge on a specific feature, the divergence flags collinearity where the lasso made an arbitrary selection between correlated features.
+:::
 
 ```{r}
 #| label: shapley-importance
 #| cache: true
 
-# Use the elastic net fit on the test set
-# Bake test data through the same recipe
-enet_baked_test <- enet_recipe |>
+lasso_baked_test <- lasso_recipe |>
   prep(training = train_df) |>
   bake(new_data = test_df)
 
-X_test <- enet_baked_test |> select(-price_de_lu)
-y_test <- enet_baked_test$price_de_lu
+X_test <- lasso_baked_test |> select(-price_de_lu)
+y_test <- lasso_baked_test$price_de_lu
 
-# glmnet predict wrapper for iml compatibility
-enet_engine <- extract_fit_engine(enet_fit)
-enet_predict <- function(model, newdata) {
-  predict(model, as.matrix(newdata), s = best_enet$penalty)[, 1]
+lasso_engine_perm <- extract_fit_engine(lasso_fit)
+lasso_predict <- function(model, newdata) {
+  predict(model, as.matrix(newdata), s = best_lasso$penalty)[, 1]
 }
 
 predictor_obj <- Predictor$new(
-  model = enet_engine,
+  model = lasso_engine_perm,
   data  = X_test,
   y     = y_test,
-  predict.function = enet_predict
+  predict.function = lasso_predict
 )
 
 set.seed(42)
@@ -901,7 +1070,7 @@ feat_imp <- FeatureImp$new(predictor_obj, loss = "mse", n.repetitions = 10)
 
 ```{r}
 #| label: fig-shapley
-#| fig-cap: "Permutation importance (ratio of permuted MSE to baseline MSE). Values above 1 indicate the feature contributes to model accuracy. Results broadly confirm the partial R² findings."
+#| fig-cap: "Permutation importance (ratio of permuted MSE to baseline MSE). Values above 1 indicate the feature contributes to model accuracy."
 
 feat_imp$results |>
   as_tibble() |>
@@ -910,7 +1079,7 @@ feat_imp$results |>
   geom_col(fill = "#457B9D", width = 0.6) +
   geom_vline(xintercept = 1, linetype = "dashed", colour = "grey50") +
   labs(
-    title = "Permutation Feature Importance (Elastic Net on Test Set)",
+    title = "Permutation Feature Importance (Lasso on Test Set)",
     subtitle = "Ratio of permuted MSE to baseline MSE — higher = more important",
     x = "Importance (MSE ratio)", y = NULL
   )
@@ -920,15 +1089,18 @@ feat_imp$results |>
 # 10.0 Key Findings {#sec-findings}
 
 ::: {.callout-important title="Summary"}
-1. **Renewable share is the dominant driver of price variance in summer**, when solar generation swings price between midday troughs and evening peaks.
-2. **Gas price (TTF) dominates in winter**, when gas plants are on the margin for extended periods and the fuel cost directly sets the clearing price.
-3. **Residual load contributes throughout the year** but is most important in autumn and spring shoulder seasons, when neither renewable nor gas effects dominate.
-4. **Net exports have a measurable but secondary effect**, consistent with Germany's central position in the CWE interconnected market.
-5. **Temporal patterns (hour, day-of-week) capture structural demand cycles** — the weekday/weekend and peak/off-peak differentials — contributing consistently across all seasons.
-6. The **elastic net provides a transparent, interpretable decomposition** with regularisation handling multicollinearity, while the XGBoost benchmark confirms that the linear model captures the bulk of explainable variance.
+1. **Fuel cost shocks dominated European electricity price variance during 2020-2022.** The TTF gas price alone explains 50-80% of seasonal price variance in the full sample — the energy crisis was the single largest source of price risk.
+2. **In the post-crisis market (2023-2025), renewable variability and residual load emerge as the primary drivers.** With gas prices stabilised, the merit-order effects that shape day-ahead pricing become visible.
+3. **Renewable share dominates summer price variance** in the post-crisis period, when solar generation swings prices between midday troughs and evening peaks.
+4. **Residual load is most important in shoulder seasons** (spring, autumn), when neither renewable nor gas effects dominate.
+5. **Net exports have a measurable but secondary effect**, consistent with Germany's central position in the CWE interconnected market.
+6. **Temporal patterns (hour, day-of-week) capture structural demand cycles** — contributing consistently across all seasons.
+7. **Heteroskedasticity is a structural feature of electricity markets**, not a model failure. All results are reported in raw EUR/MWh with HC-robust standard errors for valid inference.
+8. **Negative prices are preserved in the model** — they reflect conventional inflexibility during renewable oversupply and are economically important for hedging.
+9. **Quantile XGBoost provides distributional predictions** for risk analysis, producing a 90% prediction interval that brackets extreme price events. These feed directly into the Stage 3 VaR/CVaR framework.
 :::
 
-These findings inform the risk quantification in the next section: the seasonal attribution structure means that a hedging strategy must account for *which* risk factor dominates in the delivery period. A winter forward contract is primarily a gas price bet; a summer contract is primarily a renewable variability bet.
+These findings inform the risk quantification in the next section: the seasonal attribution structure means that a hedging strategy must account for *which* risk factor dominates in the delivery period. In today's market, a summer forward position is primarily a renewable variability bet; shoulder-season contracts depend on residual load dynamics; and the ever-present tail risk of another fuel cost shock requires monitoring through the quantile framework.
 
 
 ::: {.callout-note title="Data Attribution"}
