@@ -22,6 +22,7 @@ from entsoe import EntsoePandasClient
 ZONES = ["DK_1", "DK_2", "FR", "NL", "BE", "AT",
          "NO_1", "NO_2", "NO_3", "NO_4", "NO_5",
          "SE_1", "SE_2", "SE_3", "SE_4", "FI"]
+         
 START_YEAR = 2020
 END_YEAR = 2025
 OUTPUT_DIR = Path("data/processed/entsoe")
