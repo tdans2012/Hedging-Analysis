@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Risk Quantification &amp; Hedging Implications</title>
+<title>Risk Quantification &amp; Hedging Implications – Renewable Variability &amp; Electricity Price Risk</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -58,44 +58,128 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </style>
 
 
-<script src="04_risk_files/libs/clipboard/clipboard.min.js"></script>
-<script src="04_risk_files/libs/quarto-html/quarto.js" type="module"></script>
-<script src="04_risk_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="04_risk_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
-<script src="04_risk_files/libs/quarto-html/popper.min.js"></script>
-<script src="04_risk_files/libs/quarto-html/tippy.umd.min.js"></script>
-<script src="04_risk_files/libs/quarto-html/anchor.min.js"></script>
-<link href="04_risk_files/libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="04_risk_files/libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="04_risk_files/libs/bootstrap/bootstrap.min.js"></script>
-<link href="04_risk_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="04_risk_files/libs/bootstrap/bootstrap-9e3ffae467580fdb927a41352e75a2e0.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
-<script src="04_risk_files/libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-1d4f84655f446305ac42a8f1abcf7405.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script src="site_libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
 
-<script src="04_risk_files/libs/plotly-binding-4.12.0/plotly.js"></script>
+<script src="site_libs/plotly-binding-4.12.0/plotly.js"></script>
 
-<script src="04_risk_files/libs/typedarray-0.1/typedarray.min.js"></script>
+<script src="site_libs/typedarray-0.1/typedarray.min.js"></script>
 
-<script src="04_risk_files/libs/jquery-3.5.1/jquery.min.js"></script>
+<script src="site_libs/jquery-3.5.1/jquery.min.js"></script>
 
-<link href="04_risk_files/libs/crosstalk-1.2.2/css/crosstalk.min.css" rel="stylesheet">
+<link href="site_libs/crosstalk-1.2.2/css/crosstalk.min.css" rel="stylesheet">
 
-<script src="04_risk_files/libs/crosstalk-1.2.2/js/crosstalk.min.js"></script>
+<script src="site_libs/crosstalk-1.2.2/js/crosstalk.min.js"></script>
 
-<link href="04_risk_files/libs/plotly-htmlwidgets-css-2.25.2/plotly-htmlwidgets.css" rel="stylesheet">
+<link href="site_libs/plotly-htmlwidgets-css-2.25.2/plotly-htmlwidgets.css" rel="stylesheet">
 
-<script src="04_risk_files/libs/plotly-main-2.25.2/plotly-latest.min.js"></script>
+<script src="site_libs/plotly-main-2.25.2/plotly-latest.min.js"></script>
 
 
 
 </head>
 
-<body class="quarto-light">
+<body class="nav-fixed quarto-light">
 
-<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
-<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-  <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">Table of contents</h2>
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a href="./index.html" class="navbar-brand navbar-brand-logo">
+    </a>
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">Renewable Variability &amp; Electricity Price Risk</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Overview</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./01_data.html"> 
+<span class="menu-text">1. Data</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./02_weather.html"> 
+<span class="menu-text">2. Weather → Generation</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./03_prices.html"> 
+<span class="menu-text">3. Price Decomposition</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link active" href="./04_risk.html" aria-current="page"> 
+<span class="menu-text">4. Risk &amp; Hedging</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
    
   <ul>
   <li><a href="#sec-portfolio" id="toc-sec-portfolio" class="nav-link active" data-scroll-target="#sec-portfolio"><span class="header-section-number">1</span> Portfolio Definition</a></li>
@@ -132,7 +216,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   </ul></li>
   </ul>
 </nav>
-</div>
+    </div>
+<!-- main -->
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
@@ -173,23 +258,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cols_align</span>(<span class="at">align =</span> <span class="st">"left"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output-display">
-<div id="qkjkbofaqc" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#qkjkbofaqc table {
+<div id="jislispgyp" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#jislispgyp table {
   font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#qkjkbofaqc thead, #qkjkbofaqc tbody, #qkjkbofaqc tfoot, #qkjkbofaqc tr, #qkjkbofaqc td, #qkjkbofaqc th {
+#jislispgyp thead, #jislispgyp tbody, #jislispgyp tfoot, #jislispgyp tr, #jislispgyp td, #jislispgyp th {
   border-style: none;
 }
 
-#qkjkbofaqc p {
+#jislispgyp p {
   margin: 0;
   padding: 0;
 }
 
-#qkjkbofaqc .gt_table {
+#jislispgyp .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -215,12 +300,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-left-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_caption {
+#jislispgyp .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#qkjkbofaqc .gt_title {
+#jislispgyp .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -232,7 +317,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-width: 0;
 }
 
-#qkjkbofaqc .gt_subtitle {
+#jislispgyp .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -244,7 +329,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-width: 0;
 }
 
-#qkjkbofaqc .gt_heading {
+#jislispgyp .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -256,13 +341,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_bottom_border {
+#jislispgyp .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_col_headings {
+#jislispgyp .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -277,7 +362,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_col_heading {
+#jislispgyp .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -297,7 +382,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#qkjkbofaqc .gt_column_spanner_outer {
+#jislispgyp .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -309,15 +394,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 4px;
 }
 
-#qkjkbofaqc .gt_column_spanner_outer:first-child {
+#jislispgyp .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#qkjkbofaqc .gt_column_spanner_outer:last-child {
+#jislispgyp .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#qkjkbofaqc .gt_column_spanner {
+#jislispgyp .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -329,11 +414,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   width: 100%;
 }
 
-#qkjkbofaqc .gt_spanner_row {
+#jislispgyp .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#qkjkbofaqc .gt_group_heading {
+#jislispgyp .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -359,7 +444,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   text-align: left;
 }
 
-#qkjkbofaqc .gt_empty_group_heading {
+#jislispgyp .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -374,15 +459,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: middle;
 }
 
-#qkjkbofaqc .gt_from_md > :first-child {
+#jislispgyp .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#qkjkbofaqc .gt_from_md > :last-child {
+#jislispgyp .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#qkjkbofaqc .gt_row {
+#jislispgyp .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -401,7 +486,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#qkjkbofaqc .gt_stub {
+#jislispgyp .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -414,7 +499,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#qkjkbofaqc .gt_stub_row_group {
+#jislispgyp .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -428,15 +513,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: top;
 }
 
-#qkjkbofaqc .gt_row_group_first td {
+#jislispgyp .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#qkjkbofaqc .gt_row_group_first th {
+#jislispgyp .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#qkjkbofaqc .gt_summary_row {
+#jislispgyp .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -446,16 +531,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#qkjkbofaqc .gt_first_summary_row {
+#jislispgyp .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_first_summary_row.thick {
+#jislispgyp .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#qkjkbofaqc .gt_last_summary_row {
+#jislispgyp .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -465,7 +550,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_grand_summary_row {
+#jislispgyp .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -475,7 +560,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#qkjkbofaqc .gt_first_grand_summary_row {
+#jislispgyp .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -485,7 +570,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_last_grand_summary_row_top {
+#jislispgyp .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -495,11 +580,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_striped {
+#jislispgyp .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#qkjkbofaqc .gt_table_body {
+#jislispgyp .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -508,7 +593,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_footnotes {
+#jislispgyp .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -522,7 +607,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_footnote {
+#jislispgyp .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -531,7 +616,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#qkjkbofaqc .gt_sourcenotes {
+#jislispgyp .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -545,7 +630,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#qkjkbofaqc .gt_sourcenote {
+#jislispgyp .gt_sourcenote {
   font-size: 90%;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -553,72 +638,72 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#qkjkbofaqc .gt_left {
+#jislispgyp .gt_left {
   text-align: left;
 }
 
-#qkjkbofaqc .gt_center {
+#jislispgyp .gt_center {
   text-align: center;
 }
 
-#qkjkbofaqc .gt_right {
+#jislispgyp .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#qkjkbofaqc .gt_font_normal {
+#jislispgyp .gt_font_normal {
   font-weight: normal;
 }
 
-#qkjkbofaqc .gt_font_bold {
+#jislispgyp .gt_font_bold {
   font-weight: bold;
 }
 
-#qkjkbofaqc .gt_font_italic {
+#jislispgyp .gt_font_italic {
   font-style: italic;
 }
 
-#qkjkbofaqc .gt_super {
+#jislispgyp .gt_super {
   font-size: 65%;
 }
 
-#qkjkbofaqc .gt_footnote_marks {
+#jislispgyp .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#qkjkbofaqc .gt_asterisk {
+#jislispgyp .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#qkjkbofaqc .gt_indent_1 {
+#jislispgyp .gt_indent_1 {
   text-indent: 5px;
 }
 
-#qkjkbofaqc .gt_indent_2 {
+#jislispgyp .gt_indent_2 {
   text-indent: 10px;
 }
 
-#qkjkbofaqc .gt_indent_3 {
+#jislispgyp .gt_indent_3 {
   text-indent: 15px;
 }
 
-#qkjkbofaqc .gt_indent_4 {
+#jislispgyp .gt_indent_4 {
   text-indent: 20px;
 }
 
-#qkjkbofaqc .gt_indent_5 {
+#jislispgyp .gt_indent_5 {
   text-indent: 25px;
 }
 
-#qkjkbofaqc .katex-display {
+#jislispgyp .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#qkjkbofaqc div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#jislispgyp div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 </style>
@@ -807,23 +892,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tab_header</span>(<span class="at">title =</span> <span class="st">"Conditional Values for Weather-Only Variant"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output-display">
-<div id="orabvnanbr" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#orabvnanbr table {
+<div id="fygpykcyyf" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#fygpykcyyf table {
   font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#orabvnanbr thead, #orabvnanbr tbody, #orabvnanbr tfoot, #orabvnanbr tr, #orabvnanbr td, #orabvnanbr th {
+#fygpykcyyf thead, #fygpykcyyf tbody, #fygpykcyyf tfoot, #fygpykcyyf tr, #fygpykcyyf td, #fygpykcyyf th {
   border-style: none;
 }
 
-#orabvnanbr p {
+#fygpykcyyf p {
   margin: 0;
   padding: 0;
 }
 
-#orabvnanbr .gt_table {
+#fygpykcyyf .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -849,12 +934,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-left-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_caption {
+#fygpykcyyf .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#orabvnanbr .gt_title {
+#fygpykcyyf .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -866,7 +951,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-width: 0;
 }
 
-#orabvnanbr .gt_subtitle {
+#fygpykcyyf .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -878,7 +963,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-width: 0;
 }
 
-#orabvnanbr .gt_heading {
+#fygpykcyyf .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -890,13 +975,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_bottom_border {
+#fygpykcyyf .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_col_headings {
+#fygpykcyyf .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -911,7 +996,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_col_heading {
+#fygpykcyyf .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -931,7 +1016,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#orabvnanbr .gt_column_spanner_outer {
+#fygpykcyyf .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -943,15 +1028,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 4px;
 }
 
-#orabvnanbr .gt_column_spanner_outer:first-child {
+#fygpykcyyf .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#orabvnanbr .gt_column_spanner_outer:last-child {
+#fygpykcyyf .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#orabvnanbr .gt_column_spanner {
+#fygpykcyyf .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -963,11 +1048,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   width: 100%;
 }
 
-#orabvnanbr .gt_spanner_row {
+#fygpykcyyf .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#orabvnanbr .gt_group_heading {
+#fygpykcyyf .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -993,7 +1078,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   text-align: left;
 }
 
-#orabvnanbr .gt_empty_group_heading {
+#fygpykcyyf .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -1008,15 +1093,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: middle;
 }
 
-#orabvnanbr .gt_from_md > :first-child {
+#fygpykcyyf .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#orabvnanbr .gt_from_md > :last-child {
+#fygpykcyyf .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#orabvnanbr .gt_row {
+#fygpykcyyf .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1035,7 +1120,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#orabvnanbr .gt_stub {
+#fygpykcyyf .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1048,7 +1133,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#orabvnanbr .gt_stub_row_group {
+#fygpykcyyf .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1062,15 +1147,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: top;
 }
 
-#orabvnanbr .gt_row_group_first td {
+#fygpykcyyf .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#orabvnanbr .gt_row_group_first th {
+#fygpykcyyf .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#orabvnanbr .gt_summary_row {
+#fygpykcyyf .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -1080,16 +1165,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#orabvnanbr .gt_first_summary_row {
+#fygpykcyyf .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_first_summary_row.thick {
+#fygpykcyyf .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#orabvnanbr .gt_last_summary_row {
+#fygpykcyyf .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1099,7 +1184,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_grand_summary_row {
+#fygpykcyyf .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -1109,7 +1194,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#orabvnanbr .gt_first_grand_summary_row {
+#fygpykcyyf .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1119,7 +1204,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_last_grand_summary_row_top {
+#fygpykcyyf .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1129,11 +1214,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_striped {
+#fygpykcyyf .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#orabvnanbr .gt_table_body {
+#fygpykcyyf .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -1142,7 +1227,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_footnotes {
+#fygpykcyyf .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -1156,7 +1241,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_footnote {
+#fygpykcyyf .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -1165,7 +1250,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#orabvnanbr .gt_sourcenotes {
+#fygpykcyyf .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -1179,7 +1264,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#orabvnanbr .gt_sourcenote {
+#fygpykcyyf .gt_sourcenote {
   font-size: 90%;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -1187,72 +1272,72 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#orabvnanbr .gt_left {
+#fygpykcyyf .gt_left {
   text-align: left;
 }
 
-#orabvnanbr .gt_center {
+#fygpykcyyf .gt_center {
   text-align: center;
 }
 
-#orabvnanbr .gt_right {
+#fygpykcyyf .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#orabvnanbr .gt_font_normal {
+#fygpykcyyf .gt_font_normal {
   font-weight: normal;
 }
 
-#orabvnanbr .gt_font_bold {
+#fygpykcyyf .gt_font_bold {
   font-weight: bold;
 }
 
-#orabvnanbr .gt_font_italic {
+#fygpykcyyf .gt_font_italic {
   font-style: italic;
 }
 
-#orabvnanbr .gt_super {
+#fygpykcyyf .gt_super {
   font-size: 65%;
 }
 
-#orabvnanbr .gt_footnote_marks {
+#fygpykcyyf .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#orabvnanbr .gt_asterisk {
+#fygpykcyyf .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#orabvnanbr .gt_indent_1 {
+#fygpykcyyf .gt_indent_1 {
   text-indent: 5px;
 }
 
-#orabvnanbr .gt_indent_2 {
+#fygpykcyyf .gt_indent_2 {
   text-indent: 10px;
 }
 
-#orabvnanbr .gt_indent_3 {
+#fygpykcyyf .gt_indent_3 {
   text-indent: 15px;
 }
 
-#orabvnanbr .gt_indent_4 {
+#fygpykcyyf .gt_indent_4 {
   text-indent: 20px;
 }
 
-#orabvnanbr .gt_indent_5 {
+#fygpykcyyf .gt_indent_5 {
   text-indent: 25px;
 }
 
-#orabvnanbr .katex-display {
+#fygpykcyyf .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#orabvnanbr div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#fygpykcyyf div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 </style>
@@ -2949,7 +3034,7 @@ Figure&nbsp;3: Hourly day-ahead price correlations across European bidding zones
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-zone-correlation-map-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div id="htmlwidget-957ec931f9e0d35b1aa1" style="width:100%;height:505px;" class="plotly html-widget"></div>
-<script type="application/json" data-for="htmlwidget-957ec931f9e0d35b1aa1">{"x":{"visdat":{"518052e96642":["function () ","plotlyVisDat"],"518034974568":["function () ","data"]},"cur_data":"518034974568","attrs":{"518052e96642":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"choropleth","locations":["AUT","BEL","DNK","FIN","FRA","NLD","NOR","SWE","DEU"],"z":[0.95601581218762632,0.9602565667018913,0.95288731612734245,0.64073000961841942,0.89214822838997698,0.9676020740869048,0.61327384047056388,0.56284929590847299,1],"colorscale":[["0","rgb(222,235,247)"],["0.25","rgb(247,247,247)"],["0.5","rgb(253,208,162)"],["0.75","rgb(227,120,71)"],["1","rgb(178,24,43)"]],"zmin":0.14999999999999999,"zmax":1,"marker":{"line":{"color":"rgb(180,180,180)","width":1}},"colorbar":{"title":"Correlation","len":0.40000000000000002,"y":0.5},"hoverinfo":"none","showlegend":false,"inherit":true},"518052e96642.1":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,2.5],"lat":[51,46.5],"line":{"width":3.5685929135599079,"color":"rgb(198,61,61)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,46.5],"y":[10,2.5]},"518052e96642.2":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,5.5],"lat":[51,52],"line":{"width":3.8704082963476192,"color":"rgb(184,35,48)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,52],"y":[10,5.5]},"518052e96642.3":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,4.5],"lat":[51,50.799999999999997],"line":{"width":3.8410262668075652,"color":"rgb(185,38,50)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,50.799999999999997],"y":[10,4.5]},"518052e96642.4":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,14],"lat":[51,47.5],"line":{"width":3.8240632487505053,"color":"rgb(186,39,50)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,47.5],"y":[10,14]},"518052e96642.5":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,9.5],"lat":[51,56],"line":{"width":3.8680623620118078,"color":"rgb(184,35,48)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,56],"y":[10,9.5]},"518052e96642.6":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,12],"lat":[51,55.5],"line":{"width":3.7550361670069319,"color":"rgb(189,45,53)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,55.5],"y":[10,12]},"518052e96642.7":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,60],"line":{"width":3.3804848266727041,"color":"rgb(206,77,69)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,60],"y":[10,10.5]},"518052e96642.8":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,6],"lat":[51,59],"line":{"width":3.5920865869194993,"color":"rgb(197,59,60)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,59],"y":[10,6]},"518052e96642.9":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,63.5],"line":{"width":1.1758559756407176,"color":"rgb(252,222,205)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,63.5],"y":[10,10.5]},"518052e96642.10":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,15.5],"lat":[51,68],"line":{"width":0.79194341358826748,"color":"rgb(251,230,218)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,68],"y":[10,15.5]},"518052e96642.11":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,6.5],"lat":[51,60.5],"line":{"width":3.3251060065900888,"color":"rgb(209,82,71)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,60.5],"y":[10,6.5]},"518052e96642.12":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,18],"lat":[51,66],"line":{"width":1.445550814293675,"color":"rgb(252,212,190)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,66],"y":[10,18]},"518052e96642.13":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,63],"line":{"width":1.5266158970078472,"color":"rgb(251,207,184)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,63],"y":[10,16]},"518052e96642.14":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,59],"line":{"width":2.9001948985287465,"color":"rgb(228,118,88)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,59],"y":[10,16]},"518052e96642.15":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,14.5],"lat":[51,56.5],"line":{"width":3.1332271247053001,"color":"rgb(218,98,79)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,56.5],"y":[10,14.5]},"518052e96642.16":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,26],"lat":[51,62],"line":{"width":2.5629200384736777,"color":"rgb(240,144,106)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,62],"y":[10,26]},"518034974568":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"markers+text","lon":{},"lat":{},"marker":{"size":{},"color":{},"line":{"width":1.5,"color":"white"}},"text":{},"textposition":"top center","textfont":{"size":10,"color":"rgb(50,50,50)"},"hovertext":{},"hoverinfo":"text","showlegend":false,"inherit":true,"x":{},"y":{}},"518034974568.1":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"markers+text","lon":10,"lat":51,"marker":{"size":16,"color":"#B2182B","symbol":"diamond","line":{"width":2,"color":"white"}},"text":"DE-LU","textposition":"top center","textfont":{"size":12,"color":"black","family":"Arial"},"hovertext":"<b>DE-LU<\/b><br>Reference zone","hoverinfo":"text","showlegend":false,"inherit":true,"x":51,"y":10}},"layout":{"width":900,"height":700,"margin":{"b":20,"l":60,"t":60,"r":10},"mapType":"geo","title":{"text":"How Correlated Are European Electricity Prices with Germany?","font":{"size":16}},"geo":{"domain":{"x":[0,1],"y":[0,1]},"scope":"europe","projection":{"type":"mercator"},"lonaxis":{"range":[-5,30]},"lataxis":{"range":[44,72]},"showland":true,"landcolor":"rgb(235,235,235)","showocean":true,"oceancolor":"rgb(225,235,245)","showcountries":true,"countrycolor":"rgb(180,180,180)","showlakes":true,"lakecolor":"rgb(225,235,245)","showcoastlines":true,"coastlinecolor":"rgb(180,180,180)","resolution":50},"showlegend":false,"scene":{"zaxis":{"title":[]}},"hovermode":"closest"},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"colorbar":{"title":"Correlation","ticklen":2,"len":0.40000000000000002,"y":0.5},"colorscale":[["0","rgb(222,235,247)"],["0.25","rgb(247,247,247)"],["0.5","rgb(253,208,162)"],["0.75","rgb(227,120,71)"],["1","rgb(178,24,43)"]],"showscale":true,"type":"choropleth","locations":["AUT","BEL","DNK","FIN","FRA","NLD","NOR","SWE","DEU"],"z":[0.95601581218762632,0.9602565667018913,0.95288731612734245,0.64073000961841942,0.89214822838997698,0.9676020740869048,0.61327384047056388,0.56284929590847299,1],"zmin":0.14999999999999999,"zmax":1,"marker":{"line":{"color":"rgb(180,180,180)","width":1}},"hoverinfo":["none","none","none","none","none","none","none","none","none"],"showlegend":false,"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,2.5],"lat":[51,46.5],"line":{"color":"rgb(198,61,61)","width":3.5685929135599079},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(255,127,14,1)","line":{"color":"rgba(255,127,14,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,5.5],"lat":[51,52],"line":{"color":"rgb(184,35,48)","width":3.8704082963476192},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(44,160,44,1)","line":{"color":"rgba(44,160,44,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,4.5],"lat":[51,50.799999999999997],"line":{"color":"rgb(185,38,50)","width":3.8410262668075652},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(214,39,40,1)","line":{"color":"rgba(214,39,40,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,14],"lat":[51,47.5],"line":{"color":"rgb(186,39,50)","width":3.8240632487505053},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(148,103,189,1)","line":{"color":"rgba(148,103,189,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,9.5],"lat":[51,56],"line":{"color":"rgb(184,35,48)","width":3.8680623620118078},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(140,86,75,1)","line":{"color":"rgba(140,86,75,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,12],"lat":[51,55.5],"line":{"color":"rgb(189,45,53)","width":3.7550361670069319},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(227,119,194,1)","line":{"color":"rgba(227,119,194,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,60],"line":{"color":"rgb(206,77,69)","width":3.3804848266727041},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(127,127,127,1)","line":{"color":"rgba(127,127,127,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,6],"lat":[51,59],"line":{"color":"rgb(197,59,60)","width":3.5920865869194993},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(188,189,34,1)","line":{"color":"rgba(188,189,34,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,63.5],"line":{"color":"rgb(252,222,205)","width":1.1758559756407176},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(23,190,207,1)","line":{"color":"rgba(23,190,207,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,15.5],"lat":[51,68],"line":{"color":"rgb(251,230,218)","width":0.79194341358826748},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,6.5],"lat":[51,60.5],"line":{"color":"rgb(209,82,71)","width":3.3251060065900888},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(255,127,14,1)","line":{"color":"rgba(255,127,14,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,18],"lat":[51,66],"line":{"color":"rgb(252,212,190)","width":1.445550814293675},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(44,160,44,1)","line":{"color":"rgba(44,160,44,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,63],"line":{"color":"rgb(251,207,184)","width":1.5266158970078472},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(214,39,40,1)","line":{"color":"rgba(214,39,40,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,59],"line":{"color":"rgb(228,118,88)","width":2.9001948985287465},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(148,103,189,1)","line":{"color":"rgba(148,103,189,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,14.5],"lat":[51,56.5],"line":{"color":"rgb(218,98,79)","width":3.1332271247053001},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(140,86,75,1)","line":{"color":"rgba(140,86,75,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,26],"lat":[51,62],"line":{"color":"rgb(240,144,106)","width":2.5629200384736777},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(227,119,194,1)","line":{"color":"rgba(227,119,194,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"markers+text","lon":[2.5,5.5,4.5,14,9.5,12,10.5,6,10.5,15.5,6.5,18,16,16,14.5,26],"lat":[46.5,52,50.799999999999997,47.5,56,55.5,60,59,63.5,68,60.5,66,63,59,56.5,62],"marker":{"color":["rgb(198,61,61)","rgb(184,35,48)","rgb(185,38,50)","rgb(186,39,50)","rgb(184,35,48)","rgb(189,45,53)","rgb(206,77,69)","rgb(197,59,60)","rgb(252,222,205)","rgb(251,230,218)","rgb(209,82,71)","rgb(252,212,190)","rgb(251,207,184)","rgb(228,118,88)","rgb(218,98,79)","rgb(240,144,106)"],"size":[27.303705709749426,29.190051852172619,29.006414167547284,28.900395304690658,29.175389762573797,28.468976043793326,26.128030166704402,27.450541168246872,12.349099847754484,9.9496463349266726,25.781912541188056,14.034692589335469,14.541349356299044,23.126218115804665,24.582669529408125,21.018250240460485],"line":{"color":"white","width":1.5}},"text":["FR (0.89)","NL (0.97)","BE (0.96)","AT (0.96)","DK1 (0.97)","DK2 (0.94)","NO1 (0.85)","NO2 (0.90)","NO3 (0.29)","NO4 (0.20)","NO5 (0.83)","SE1 (0.36)","SE2 (0.38)","SE3 (0.73)","SE4 (0.78)","FI (0.64)"],"textposition":["top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center"],"textfont":{"size":10,"color":"rgb(50,50,50)"},"hovertext":["<b>FR<\/b><br>Correlation with DE-LU: <b>0.89<\/b>","<b>NL<\/b><br>Correlation with DE-LU: <b>0.97<\/b>","<b>BE<\/b><br>Correlation with DE-LU: <b>0.96<\/b>","<b>AT<\/b><br>Correlation with DE-LU: <b>0.96<\/b>","<b>DK1<\/b><br>Correlation with DE-LU: <b>0.97<\/b>","<b>DK2<\/b><br>Correlation with DE-LU: <b>0.94<\/b>","<b>NO1<\/b><br>Correlation with DE-LU: <b>0.85<\/b>","<b>NO2<\/b><br>Correlation with DE-LU: <b>0.90<\/b>","<b>NO3<\/b><br>Correlation with DE-LU: <b>0.29<\/b>","<b>NO4<\/b><br>Correlation with DE-LU: <b>0.20<\/b>","<b>NO5<\/b><br>Correlation with DE-LU: <b>0.83<\/b>","<b>SE1<\/b><br>Correlation with DE-LU: <b>0.36<\/b>","<b>SE2<\/b><br>Correlation with DE-LU: <b>0.38<\/b>","<b>SE3<\/b><br>Correlation with DE-LU: <b>0.73<\/b>","<b>SE4<\/b><br>Correlation with DE-LU: <b>0.78<\/b>","<b>FI<\/b><br>Correlation with DE-LU: <b>0.64<\/b>"],"hoverinfo":["text","text","text","text","text","text","text","text","text","text","text","text","text","text","text","text"],"showlegend":false,"line":{"color":"rgba(127,127,127,1)"},"geo":"geo","frame":null},{"type":"scattergeo","mode":"markers+text","lon":[10],"lat":[51],"marker":{"color":"#B2182B","size":16,"symbol":"diamond","line":{"color":"white","width":2}},"text":"DE-LU","textposition":"top center","textfont":{"size":12,"color":"black","family":"Arial"},"hovertext":"<b>DE-LU<\/b><br>Reference zone","hoverinfo":"text","showlegend":false,"line":{"color":"rgba(188,189,34,1)"},"geo":"geo","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.20000000000000001,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<script type="application/json" data-for="htmlwidget-957ec931f9e0d35b1aa1">{"x":{"visdat":{"53685015f47":["function () ","plotlyVisDat"],"53683bf4371a":["function () ","data"]},"cur_data":"53683bf4371a","attrs":{"53685015f47":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"choropleth","locations":["AUT","BEL","DNK","FIN","FRA","NLD","NOR","SWE","DEU"],"z":[0.95601581218762632,0.9602565667018913,0.95288731612734245,0.64073000961841942,0.89214822838997698,0.9676020740869048,0.61327384047056388,0.56284929590847299,1],"colorscale":[["0","rgb(222,235,247)"],["0.25","rgb(247,247,247)"],["0.5","rgb(253,208,162)"],["0.75","rgb(227,120,71)"],["1","rgb(178,24,43)"]],"zmin":0.14999999999999999,"zmax":1,"marker":{"line":{"color":"rgb(180,180,180)","width":1}},"colorbar":{"title":"Correlation","len":0.40000000000000002,"y":0.5},"hoverinfo":"none","showlegend":false,"inherit":true},"53685015f47.1":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,2.5],"lat":[51,46.5],"line":{"width":3.5685929135599079,"color":"rgb(198,61,61)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,46.5],"y":[10,2.5]},"53685015f47.2":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,5.5],"lat":[51,52],"line":{"width":3.8704082963476192,"color":"rgb(184,35,48)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,52],"y":[10,5.5]},"53685015f47.3":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,4.5],"lat":[51,50.799999999999997],"line":{"width":3.8410262668075652,"color":"rgb(185,38,50)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,50.799999999999997],"y":[10,4.5]},"53685015f47.4":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,14],"lat":[51,47.5],"line":{"width":3.8240632487505053,"color":"rgb(186,39,50)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,47.5],"y":[10,14]},"53685015f47.5":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,9.5],"lat":[51,56],"line":{"width":3.8680623620118078,"color":"rgb(184,35,48)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,56],"y":[10,9.5]},"53685015f47.6":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,12],"lat":[51,55.5],"line":{"width":3.7550361670069319,"color":"rgb(189,45,53)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,55.5],"y":[10,12]},"53685015f47.7":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,60],"line":{"width":3.3804848266727041,"color":"rgb(206,77,69)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,60],"y":[10,10.5]},"53685015f47.8":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,6],"lat":[51,59],"line":{"width":3.5920865869194993,"color":"rgb(197,59,60)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,59],"y":[10,6]},"53685015f47.9":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,63.5],"line":{"width":1.1758559756407176,"color":"rgb(252,222,205)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,63.5],"y":[10,10.5]},"53685015f47.10":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,15.5],"lat":[51,68],"line":{"width":0.79194341358826748,"color":"rgb(251,230,218)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,68],"y":[10,15.5]},"53685015f47.11":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,6.5],"lat":[51,60.5],"line":{"width":3.3251060065900888,"color":"rgb(209,82,71)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,60.5],"y":[10,6.5]},"53685015f47.12":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,18],"lat":[51,66],"line":{"width":1.445550814293675,"color":"rgb(252,212,190)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,66],"y":[10,18]},"53685015f47.13":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,63],"line":{"width":1.5266158970078472,"color":"rgb(251,207,184)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,63],"y":[10,16]},"53685015f47.14":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,59],"line":{"width":2.9001948985287465,"color":"rgb(228,118,88)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,59],"y":[10,16]},"53685015f47.15":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,14.5],"lat":[51,56.5],"line":{"width":3.1332271247053001,"color":"rgb(218,98,79)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,56.5],"y":[10,14.5]},"53685015f47.16":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,26],"lat":[51,62],"line":{"width":2.5629200384736777,"color":"rgb(240,144,106)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,62],"y":[10,26]},"53683bf4371a":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"markers+text","lon":{},"lat":{},"marker":{"size":{},"color":{},"line":{"width":1.5,"color":"white"}},"text":{},"textposition":"top center","textfont":{"size":10,"color":"rgb(50,50,50)"},"hovertext":{},"hoverinfo":"text","showlegend":false,"inherit":true,"x":{},"y":{}},"53683bf4371a.1":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"markers+text","lon":10,"lat":51,"marker":{"size":16,"color":"#B2182B","symbol":"diamond","line":{"width":2,"color":"white"}},"text":"DE-LU","textposition":"top center","textfont":{"size":12,"color":"black","family":"Arial"},"hovertext":"<b>DE-LU<\/b><br>Reference zone","hoverinfo":"text","showlegend":false,"inherit":true,"x":51,"y":10}},"layout":{"width":900,"height":700,"margin":{"b":20,"l":60,"t":60,"r":10},"mapType":"geo","title":{"text":"How Correlated Are European Electricity Prices with Germany?","font":{"size":16}},"geo":{"domain":{"x":[0,1],"y":[0,1]},"scope":"europe","projection":{"type":"mercator"},"lonaxis":{"range":[-5,30]},"lataxis":{"range":[44,72]},"showland":true,"landcolor":"rgb(235,235,235)","showocean":true,"oceancolor":"rgb(225,235,245)","showcountries":true,"countrycolor":"rgb(180,180,180)","showlakes":true,"lakecolor":"rgb(225,235,245)","showcoastlines":true,"coastlinecolor":"rgb(180,180,180)","resolution":50},"showlegend":false,"scene":{"zaxis":{"title":[]}},"hovermode":"closest"},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"colorbar":{"title":"Correlation","ticklen":2,"len":0.40000000000000002,"y":0.5},"colorscale":[["0","rgb(222,235,247)"],["0.25","rgb(247,247,247)"],["0.5","rgb(253,208,162)"],["0.75","rgb(227,120,71)"],["1","rgb(178,24,43)"]],"showscale":true,"type":"choropleth","locations":["AUT","BEL","DNK","FIN","FRA","NLD","NOR","SWE","DEU"],"z":[0.95601581218762632,0.9602565667018913,0.95288731612734245,0.64073000961841942,0.89214822838997698,0.9676020740869048,0.61327384047056388,0.56284929590847299,1],"zmin":0.14999999999999999,"zmax":1,"marker":{"line":{"color":"rgb(180,180,180)","width":1}},"hoverinfo":["none","none","none","none","none","none","none","none","none"],"showlegend":false,"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,2.5],"lat":[51,46.5],"line":{"color":"rgb(198,61,61)","width":3.5685929135599079},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(255,127,14,1)","line":{"color":"rgba(255,127,14,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,5.5],"lat":[51,52],"line":{"color":"rgb(184,35,48)","width":3.8704082963476192},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(44,160,44,1)","line":{"color":"rgba(44,160,44,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,4.5],"lat":[51,50.799999999999997],"line":{"color":"rgb(185,38,50)","width":3.8410262668075652},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(214,39,40,1)","line":{"color":"rgba(214,39,40,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,14],"lat":[51,47.5],"line":{"color":"rgb(186,39,50)","width":3.8240632487505053},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(148,103,189,1)","line":{"color":"rgba(148,103,189,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,9.5],"lat":[51,56],"line":{"color":"rgb(184,35,48)","width":3.8680623620118078},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(140,86,75,1)","line":{"color":"rgba(140,86,75,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,12],"lat":[51,55.5],"line":{"color":"rgb(189,45,53)","width":3.7550361670069319},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(227,119,194,1)","line":{"color":"rgba(227,119,194,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,60],"line":{"color":"rgb(206,77,69)","width":3.3804848266727041},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(127,127,127,1)","line":{"color":"rgba(127,127,127,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,6],"lat":[51,59],"line":{"color":"rgb(197,59,60)","width":3.5920865869194993},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(188,189,34,1)","line":{"color":"rgba(188,189,34,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,63.5],"line":{"color":"rgb(252,222,205)","width":1.1758559756407176},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(23,190,207,1)","line":{"color":"rgba(23,190,207,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,15.5],"lat":[51,68],"line":{"color":"rgb(251,230,218)","width":0.79194341358826748},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,6.5],"lat":[51,60.5],"line":{"color":"rgb(209,82,71)","width":3.3251060065900888},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(255,127,14,1)","line":{"color":"rgba(255,127,14,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,18],"lat":[51,66],"line":{"color":"rgb(252,212,190)","width":1.445550814293675},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(44,160,44,1)","line":{"color":"rgba(44,160,44,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,63],"line":{"color":"rgb(251,207,184)","width":1.5266158970078472},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(214,39,40,1)","line":{"color":"rgba(214,39,40,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,59],"line":{"color":"rgb(228,118,88)","width":2.9001948985287465},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(148,103,189,1)","line":{"color":"rgba(148,103,189,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,14.5],"lat":[51,56.5],"line":{"color":"rgb(218,98,79)","width":3.1332271247053001},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(140,86,75,1)","line":{"color":"rgba(140,86,75,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,26],"lat":[51,62],"line":{"color":"rgb(240,144,106)","width":2.5629200384736777},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(227,119,194,1)","line":{"color":"rgba(227,119,194,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"markers+text","lon":[2.5,5.5,4.5,14,9.5,12,10.5,6,10.5,15.5,6.5,18,16,16,14.5,26],"lat":[46.5,52,50.799999999999997,47.5,56,55.5,60,59,63.5,68,60.5,66,63,59,56.5,62],"marker":{"color":["rgb(198,61,61)","rgb(184,35,48)","rgb(185,38,50)","rgb(186,39,50)","rgb(184,35,48)","rgb(189,45,53)","rgb(206,77,69)","rgb(197,59,60)","rgb(252,222,205)","rgb(251,230,218)","rgb(209,82,71)","rgb(252,212,190)","rgb(251,207,184)","rgb(228,118,88)","rgb(218,98,79)","rgb(240,144,106)"],"size":[27.303705709749426,29.190051852172619,29.006414167547284,28.900395304690658,29.175389762573797,28.468976043793326,26.128030166704402,27.450541168246872,12.349099847754484,9.9496463349266726,25.781912541188056,14.034692589335469,14.541349356299044,23.126218115804665,24.582669529408125,21.018250240460485],"line":{"color":"white","width":1.5}},"text":["FR (0.89)","NL (0.97)","BE (0.96)","AT (0.96)","DK1 (0.97)","DK2 (0.94)","NO1 (0.85)","NO2 (0.90)","NO3 (0.29)","NO4 (0.20)","NO5 (0.83)","SE1 (0.36)","SE2 (0.38)","SE3 (0.73)","SE4 (0.78)","FI (0.64)"],"textposition":["top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center"],"textfont":{"size":10,"color":"rgb(50,50,50)"},"hovertext":["<b>FR<\/b><br>Correlation with DE-LU: <b>0.89<\/b>","<b>NL<\/b><br>Correlation with DE-LU: <b>0.97<\/b>","<b>BE<\/b><br>Correlation with DE-LU: <b>0.96<\/b>","<b>AT<\/b><br>Correlation with DE-LU: <b>0.96<\/b>","<b>DK1<\/b><br>Correlation with DE-LU: <b>0.97<\/b>","<b>DK2<\/b><br>Correlation with DE-LU: <b>0.94<\/b>","<b>NO1<\/b><br>Correlation with DE-LU: <b>0.85<\/b>","<b>NO2<\/b><br>Correlation with DE-LU: <b>0.90<\/b>","<b>NO3<\/b><br>Correlation with DE-LU: <b>0.29<\/b>","<b>NO4<\/b><br>Correlation with DE-LU: <b>0.20<\/b>","<b>NO5<\/b><br>Correlation with DE-LU: <b>0.83<\/b>","<b>SE1<\/b><br>Correlation with DE-LU: <b>0.36<\/b>","<b>SE2<\/b><br>Correlation with DE-LU: <b>0.38<\/b>","<b>SE3<\/b><br>Correlation with DE-LU: <b>0.73<\/b>","<b>SE4<\/b><br>Correlation with DE-LU: <b>0.78<\/b>","<b>FI<\/b><br>Correlation with DE-LU: <b>0.64<\/b>"],"hoverinfo":["text","text","text","text","text","text","text","text","text","text","text","text","text","text","text","text"],"showlegend":false,"line":{"color":"rgba(127,127,127,1)"},"geo":"geo","frame":null},{"type":"scattergeo","mode":"markers+text","lon":[10],"lat":[51],"marker":{"color":"#B2182B","size":16,"symbol":"diamond","line":{"color":"white","width":2}},"text":"DE-LU","textposition":"top center","textfont":{"size":12,"color":"black","family":"Arial"},"hovertext":"<b>DE-LU<\/b><br>Reference zone","hoverinfo":"text","showlegend":false,"line":{"color":"rgba(188,189,34,1)"},"geo":"geo","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.20000000000000001,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-zone-correlation-map-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;4: Price correlation with DE-LU across European bidding zones — hover for details
@@ -4422,11 +4507,12 @@ Figure&nbsp;7: CVaR 95% converges well before the full simulation count
 <li><strong>Copernicus ERA5 Reanalysis:</strong> Hourly wind speed and solar irradiance. Hersbach et al.&nbsp;(2020), doi:<a href="https://doi.org/10.24381/cds.adbb2d47">10.24381/cds.adbb2d47</a>.</li>
 <li><strong>Yahoo Finance:</strong> TTF natural gas front-month futures (ICE Dutch TTF, EUR/MWh).</li>
 </ul>
+
+
 </section>
 </section>
 
-</main>
-<!-- /main column -->
+</main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -4828,6 +4914,19 @@ Figure&nbsp;7: CVaR 95% converges well before the full simulation count
   });
   </script>
 </div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+      &nbsp;
+    </div>   
+    <div class="nav-footer-center">
+<p>Data: <a href="https://www.smard.de">SMARD (CC BY 4.0)</a> · [ENTSO-E](https://transparency.entso</p>
+</div>
+    <div class="nav-footer-right">
+      &nbsp;
+    </div>
+  </div>
+</footer>
 
 
 

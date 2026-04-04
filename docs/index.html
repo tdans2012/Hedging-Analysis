@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Renewable Variability &amp; Electricity Price Risk</title>
+<title>Renewable Variability &amp; Electricity Price Risk Decomposition – Renewable Variability &amp; Electricity Price Risk</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -132,8 +132,8 @@ ul.task-list li input[type="checkbox"] {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">Renewable Variability &amp; Electricity Price Risk</h1>
-<p class="subtitle lead">A European power market case study using SMARD, ENTSO-E, and Copernicus ERA5</p>
+<h1 class="title">Renewable Variability &amp; Electricity Price Risk Decomposition</h1>
+<p class="subtitle lead">A quantitative case study in CWE electricity markets</p>
 </div>
 
 
@@ -150,17 +150,24 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
-<section id="project-summary" class="level2">
-<h2 class="anchored" data-anchor-id="project-summary">Project Summary</h2>
-<p>This case study quantifies how wind and solar generation variability drives day-ahead electricity price risk in Germany and the Nordic bidding zones. It is structured in four stages:</p>
-<ol type="1">
-<li><strong>Weather → Generation</strong> — ERA5 wind and irradiance to capacity factor models</li>
-<li><strong>Price Decomposition</strong> — attributing price variance to its physical drivers<br>
-</li>
-<li><strong>Risk Quantification</strong> — VaR and CVaR for a stylised renewable portfolio</li>
-<li><strong>Policy Implications</strong> — connecting findings to the ENTSO-E hedging framework</li>
-</ol>
-<p><em>Data sources: SMARD (Bundesnetzagentur, CC BY 4.0), ENTSO-E Transparency Platform, Copernicus ERA5 reanalysis.</em></p>
+<p>Day-ahead electricity prices in Central Western Europe are increasingly shaped by one variable above all others: how much wind is blowing and how much sun is shining. This project quantifies that relationship — and what it means for revenue risk — using five years of hourly market data from Germany, Denmark, France, and their neighbours.</p>
+<section id="the-analytical-question" class="level2">
+<h2 class="anchored" data-anchor-id="the-analytical-question">The Analytical Question</h2>
+<p><em>How much of the variance in German day-ahead electricity prices can be attributed to renewable generation variability, and what does this imply for hedging demand across bidding zones?</em></p>
+<p>The analysis is structured as a four-stage pipeline, each building on the last.</p>
+</section>
+<section id="stages" class="level2">
+<h2 class="anchored" data-anchor-id="stages">Stages</h2>
+<p><strong><a href="./01_data.html">1. Data Sources &amp; QA</a></strong><br>
+Ingestion and quality audit of SMARD generation data, ENTSO-E cross-border flows and prices, Copernicus ERA5 reanalysis weather, and TTF gas futures. Covers 17 bidding zones, 52,000+ hourly observations, 2020–2025.</p>
+<p><strong><a href="./02_weather.html">2. Weather → Generation</a></strong><br>
+ERA5 wind speed and solar irradiance mapped to capacity factors for onshore wind, offshore wind, and solar PV in DE-LU. Tidymodels workflows with temporal cross-validation. Cross-zone weather profiles for CWE and Nordic markets.</p>
+<p><strong><a href="./03_prices.html">3. Price Decomposition</a></strong><br>
+Elastic net regression decomposes DE-LU day-ahead price variance into contributions from renewable share, residual load, TTF gas price, and cross-border net exports. Partial R² and permutation importance by season.</p>
+<p><strong><a href="./04_risk.html">4. Risk Quantification &amp; Hedging Implications</a></strong><br>
+Monte Carlo revenue simulation for a stylised 400 MW onshore wind portfolio. Two variants isolate weather-driven versus total price risk. VaR, CVaR, and seasonal hedging strategy recommendations across CWE bidding zones.</p>
+<hr>
+<p><em>Data: SMARD (CC BY 4.0) · ENTSO-E Transparency Platform · Copernicus ERA5 · Yahoo Finance</em></p>
 
 
 </section>
