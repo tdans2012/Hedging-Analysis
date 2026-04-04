@@ -1,18 +1,45 @@
 ---
-title: "Renewable Variability & Electricity Price Risk"
-subtitle: "A European power market case study using SMARD, ENTSO-E, and Copernicus ERA5"
+title: "Renewable Variability & Electricity Price Risk Decomposition"
+subtitle: "A quantitative case study in CWE electricity markets"
 ---
 
-## Project Summary
+Day-ahead electricity prices in Central Western Europe are increasingly shaped 
+by one variable above all others: how much wind is blowing and how much sun is 
+shining. This project quantifies that relationship — and what it means for 
+revenue risk — using five years of hourly market data from Germany, Denmark, 
+France, and their neighbours.
 
-This case study quantifies how wind and solar generation variability 
-drives day-ahead electricity price risk in Germany and the Nordic 
-bidding zones. It is structured in four stages:
+## The Analytical Question
 
-1. **Weather → Generation** — ERA5 wind and irradiance to capacity factor models
-2. **Price Decomposition** — attributing price variance to its physical drivers  
-3. **Risk Quantification** — VaR and CVaR for a stylised renewable portfolio
-4. **Policy Implications** — connecting findings to the ENTSO-E hedging framework
+*How much of the variance in German day-ahead electricity prices can be 
+attributed to renewable generation variability, and what does this imply for 
+hedging demand across bidding zones?*
 
-*Data sources: SMARD (Bundesnetzagentur, CC BY 4.0), ENTSO-E 
-Transparency Platform, Copernicus ERA5 reanalysis.*
+The analysis is structured as a four-stage pipeline, each building on the last.
+
+## Stages
+
+**[1. Data Sources & QA](01_data.qmd)**  
+Ingestion and quality audit of SMARD generation data, ENTSO-E cross-border 
+flows and prices, Copernicus ERA5 reanalysis weather, and TTF gas futures. 
+Covers 17 bidding zones, 52,000+ hourly observations, 2020–2025.
+
+**[2. Weather → Generation](02_weather.qmd)**  
+ERA5 wind speed and solar irradiance mapped to capacity factors for onshore 
+wind, offshore wind, and solar PV in DE-LU. Tidymodels workflows with temporal 
+cross-validation. Cross-zone weather profiles for CWE and Nordic markets.
+
+**[3. Price Decomposition](03_prices.qmd)**  
+Elastic net regression decomposes DE-LU day-ahead price variance into 
+contributions from renewable share, residual load, TTF gas price, and 
+cross-border net exports. Partial R² and permutation importance by season.
+
+**[4. Risk Quantification & Hedging Implications](04_risk.qmd)**  
+Monte Carlo revenue simulation for a stylised 400 MW onshore wind portfolio. 
+Two variants isolate weather-driven versus total price risk. VaR, CVaR, and 
+seasonal hedging strategy recommendations across CWE bidding zones.
+
+---
+
+*Data: SMARD (CC BY 4.0) · ENTSO-E Transparency Platform · 
+Copernicus ERA5 · Yahoo Finance*
