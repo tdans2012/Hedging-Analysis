@@ -58,3 +58,5 @@ Thumbs.db
 ".toml/" 
 ".vscode/" 
 "*.rmarkdown" 
+".vscode/" 
+"*.rmarkdown" 
