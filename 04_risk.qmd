@@ -135,7 +135,6 @@ compute_cvar <- function(x, level = 0.95) {
 }
 ```
 
-
 # 1.0 Portfolio Definition {#sec-portfolio}
 
 This analysis quantifies the spot-price revenue risk facing a stylised, fully unhedged renewable energy portfolio in the `r params$portfolio_zone` bidding zone. The portfolio is defined as:
@@ -156,12 +155,11 @@ tibble(
   cols_align(align = "left")
 ```
 
-::: {.callout-note}
+::: callout-note
 ## What does "fully unhedged" mean?
 
 A wind farm that sells all output on the day-ahead spot market earns revenue = price × generation in each delivery hour. Both sides of this equation are weather-driven: wind speed determines generation volume, while the aggregate wind and solar fleet drives the renewable share that (per Stage 2) is the dominant price factor in summer. This creates a **natural short hedge** — high wind hours produce more MWh but depress the price via the merit order effect. The simulation below quantifies how much residual risk remains after this embedded correlation.
 :::
-
 
 # 2.0 Monte Carlo Framework {#sec-montecarlo}
 
@@ -250,7 +248,6 @@ n_remaining_na <- scenario_df |>
 cat("Remaining NAs after imputation:\n")
 print(n_remaining_na)
 ```
-
 
 ## 2.2 Predict Prices & Generation {#sec-predict}
 
@@ -341,7 +338,6 @@ cat("Mean portfolio generation:",
     round(mean(scenario_df$portfolio_gen_mwh, na.rm = TRUE), 1), "MWh/h\n")
 ```
 
-
 ## 2.3 Daily Revenue Aggregation {#sec-daily}
 
 ```{r}
@@ -368,7 +364,6 @@ cat("Complete days:", nrow(daily_revenue), "\n")
 cat("Days by season:\n")
 print(count(daily_revenue, season))
 ```
-
 
 ## 2.4 Bootstrap Simulation {#sec-bootstrap}
 
@@ -415,7 +410,6 @@ sim_results <- daily_revenue |>
 cat("Simulation complete:", nrow(sim_results), "rows\n")
 cat("(", n_sim, "simulations ×", n_distinct(sim_results$season), "seasons )\n")
 ```
-
 
 ## 2.5 Variant Comparison {#sec-variant-compare}
 
@@ -523,7 +517,6 @@ variant_summary |>
   tab_footnote("SD ratio > 1 indicates additional risk from TTF and cross-border flow variability.")
 ```
 
-
 # 3.0 Risk Metrics {#sec-risk-metrics}
 
 How much could a bad month cost? The table below answers that for each season, showing central revenue estimates alongside downside tail risk. VaR tells you the revenue floor you'll stay above in 95% (or 99%) of months. CVaR tells you the average revenue in those worst-case months — it captures how bad "bad" actually gets.
@@ -573,12 +566,11 @@ risk_metrics |>
   )
 ```
 
-::: {.callout-tip}
+::: callout-tip
 ## Reading the table
 
 Pick a row — say Winter. The median month brings in the figure shown under Median. But in the worst 5% of months (CVaR 95%), revenue drops to the CVaR 95% figure. The **Weather Share** column is the key link back to Stage 2: it tells you how much of that revenue swing comes purely from wind variability versus gas and trade flow uncertainty. A low weather share means hedging weather alone won't cover most of your risk.
 :::
-
 
 # 4.0 Cross-Zone Analysis {#sec-cross-zone}
 
@@ -619,11 +611,11 @@ ggplot(cor_long, aes(x = zone_1, y = zone_2, fill = correlation)) +
   geom_tile(colour = "white", linewidth = 0.3) +
   geom_text(aes(label = sprintf("%.2f", correlation)),
             size = 2.5, colour = "grey20") +
-  scale_fill_gradientn(
-    colours = c("#2166AC", "#67A9CF", "#F7F7F7", "#EF8A62", "#B2182B"),
-    values  = scales::rescale(c(0, 0.25, 0.5, 0.75, 1)),
-    limits  = c(0, 1),
-    name    = "Correlation"
+  scale_fill_distiller(
+    palette  = "YlOrRd",
+    direction = 1,
+    limits   = c(0, 1),
+    name     = "Correlation"
   ) +
   labs(
     title    = "How Closely Do European Electricity Prices Move Together?",
@@ -635,7 +627,6 @@ ggplot(cor_long, aes(x = zone_1, y = zone_2, fill = correlation)) +
     axis.text.y = element_text(size = 9)
   )
 ```
-
 
 ## 4.2 Geographic View — Price Linkages Across Europe {#sec-geo-map}
 
@@ -678,9 +669,8 @@ delu_corr <- tibble(
 
 delu_point <- zone_coords |> filter(zone == "DE_LU")
 
-# ── Colour mapping (sequential: blue → red) ─────────────────────────
-corr_to_colour <- colorRamp(c("#2166AC", "#67A9CF", "#F7F7F7",
-                               "#EF8A62", "#B2182B"))
+# ── Colour mapping (sequential warm) ────────────────────────────────
+corr_to_colour <- colorRamp(c("#F7F7F7", "#FDDBC7", "#EF8A62", "#B2182B"))
 
 delu_corr <- delu_corr |>
   mutate(
@@ -695,8 +685,43 @@ delu_corr <- delu_corr |>
     )
   )
 
+# ── Country-level averages for choropleth background ────────────────
+zone_to_iso3 <- tribble(
+  ~zone, ~iso3,
+  "FR", "FRA", "NL", "NLD", "BE", "BEL", "AT", "AUT",
+  "DK_1", "DNK", "DK_2", "DNK",
+  "NO_1", "NOR", "NO_2", "NOR", "NO_3", "NOR", "NO_4", "NOR", "NO_5", "NOR",
+  "SE_1", "SWE", "SE_2", "SWE", "SE_3", "SWE", "SE_4", "SWE",
+  "FI", "FIN"
+)
+
+country_corrs <- delu_corr |>
+  left_join(zone_to_iso3, by = "zone") |>
+  group_by(iso3) |>
+  summarise(corr_de_lu = mean(corr_de_lu), .groups = "drop") |>
+  bind_rows(tibble(iso3 = "DEU", corr_de_lu = 1.0))
+
 # ── Build plotly geo map ─────────────────────────────────────────────
-fig <- plot_geo() |>
+fig <- plot_geo(width = 900, height = 700) |>
+  # Choropleth background — country polygons filled by correlation
+  add_trace(
+    type       = "choropleth",
+    locations  = country_corrs$iso3,
+    z          = country_corrs$corr_de_lu,
+   colorscale = list(
+      c(0,    "rgb(222,235,247)"),
+      c(0.25, "rgb(247,247,247)"),
+      c(0.5,  "rgb(253,208,162)"),
+      c(0.75, "rgb(227,120,71)"),
+      c(1,    "rgb(178,24,43)")
+    ),
+    zmin = 0.15, zmax = 1,
+    zmin = 0, zmax = 1,
+    marker     = list(line = list(color = "rgb(180,180,180)", width = 1)),
+    colorbar   = list(title = "Correlation", len = 0.4, y = 0.5),
+    hoverinfo  = "none",
+    showlegend = FALSE
+  ) |>
   layout(
     title = list(
       text = "How Correlated Are European Electricity Prices with Germany?",
@@ -707,7 +732,7 @@ fig <- plot_geo() |>
       projection = list(type = "mercator"),
       lonaxis = list(range = c(-5, 30)),
       lataxis = list(range = c(44, 72)),
-      showland = TRUE, landcolor = "rgb(243,243,243)",
+      showland = TRUE, landcolor = "rgb(235,235,235)",
       showocean = TRUE, oceancolor = "rgb(225,235,245)",
       showcountries = TRUE, countrycolor = "rgb(180,180,180)",
       showlakes = TRUE, lakecolor = "rgb(225,235,245)",
@@ -730,8 +755,9 @@ for (i in seq_len(nrow(delu_corr))) {
         width = row$corr_de_lu * 4,
         color = row$colour_rgb
       ),
-      opacity = 0.6,
-      hoverinfo = "none"
+      opacity    = 0.9,
+      hoverinfo  = "none",
+      showlegend = FALSE
     )
 }
 
@@ -750,7 +776,8 @@ fig <- fig |>
     textposition = "top center",
     textfont = list(size = 10, color = "rgb(50,50,50)"),
     hovertext = ~hover_text,
-    hoverinfo = "text"
+    hoverinfo = "text",
+    showlegend = FALSE
   )
 
 # ── DE-LU reference marker ──────────────────────────────────────────
@@ -763,20 +790,27 @@ fig <- fig |>
       line = list(width = 2, color = "white")
     ),
     text = "DE-LU", textposition = "top center",
-    textfont = list(size = 12, color = "#B2182B", family = "Arial Black"),
+    textfont = list(size = 12, color = "black", family = "Arial"),
     hovertext = "<b>DE-LU</b><br>Reference zone",
-    hoverinfo = "text"
+    hoverinfo = "text",
+    showlegend = FALSE
   )
 
-fig
+fig |> layout(width = 900, height = 700)
 ```
 
-::: {.callout-note}
+
+
+
+
+
+
+
+::: callout-note
 ## What the map tells us
 
 Zones physically close to Germany (AT, NL, BE) show very high price correlation — their markets are tightly coupled through interconnectors. The Nordic zones (NO, SE, FI) are less correlated, meaning a portfolio spanning both CWE and the Nordics would capture some diversification benefit. But even the lowest correlations are well above zero: no European zone offers a true hedge against German price moves.
 :::
-
 
 ## 4.3 Seasonal Price Correlation {#sec-seasonal-corr}
 
@@ -818,7 +852,6 @@ ggplot(seasonal_corr, aes(x = reorder(zone, -correlation),
   ) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
-
 
 # 5.0 `r params$comparison_zone` Comparison {#sec-comparison}
 
@@ -913,7 +946,6 @@ comp_df <- comp_gen |>
 cat(glue("{comp_zone} scenario table: {nrow(comp_df)} rows, ",
          "{sum(complete.cases(comp_df))} complete cases\n"))
 ```
-
 
 ## 5.2 Seasonal Variance Attribution {#sec-comp-regression}
 
@@ -1021,12 +1053,11 @@ r2_summary |>
   )
 ```
 
-::: {.callout-note}
+::: callout-note
 ## Interpreting the comparison
 
 If `r comp_zone` has higher wind penetration than Germany, we'd expect renewable share to dominate price variance across more seasons — not just summer. Conversely, if gas generation plays a smaller role, TTF should matter less. These structural differences determine what a hedging strategy needs to cover in each market.
 :::
-
 
 # 6.0 Hedging Implications {#sec-hedging}
 
@@ -1076,18 +1107,17 @@ The ENTSO-E [Forward Capacity Allocation (FCA) regulation](https://www.entsoe.eu
 
 Our cross-zone analysis shows why this matters:
 
-- **CWE neighbours (AT, NL, BE, FR)** are highly correlated with DE-LU. Buying transmission rights into these zones provides limited price diversification — prices move together. The primary value of CWE interconnection is **physical delivery optionality**, not price hedging.
+-   **CWE neighbours (AT, NL, BE, FR)** are highly correlated with DE-LU. Buying transmission rights into these zones provides limited price diversification — prices move together. The primary value of CWE interconnection is **physical delivery optionality**, not price hedging.
 
-- **Nordic zones (NO, SE, FI)** show lower correlation, meaning interconnector capacity to the Nordics offers genuine **portfolio diversification**. However, this is constrained by physical capacity and allocation mechanisms under the FCA framework.
+-   **Nordic zones (NO, SE, FI)** show lower correlation, meaning interconnector capacity to the Nordics offers genuine **portfolio diversification**. However, this is constrained by physical capacity and allocation mechanisms under the FCA framework.
 
-- **Seasonal variation** in correlation means the diversification benefit itself is not constant. A hedging strategy that relies on Nordic decorrelation in summer may find that correlation tightens in winter when the entire continent faces cold weather simultaneously.
+-   **Seasonal variation** in correlation means the diversification benefit itself is not constant. A hedging strategy that relies on Nordic decorrelation in summer may find that correlation tightens in winter when the entire continent faces cold weather simultaneously.
 
-::: {.callout-important}
+::: callout-important
 ## The policy punchline
 
 Forward capacity allocation isn't just a grid operations question — it's a risk management tool. The FCA framework directly affects whether renewable generators can access the cross-border diversification that our correlation analysis shows exists in the Nordics. Market participants bidding for long-term transmission rights should account for the seasonal correlation structure documented here.
 :::
-
 
 # 7.0 Technical Notes {#sec-appendix}
 
@@ -1137,16 +1167,16 @@ ggplot(convergence, aes(x = running_n, y = running_cvar)) +
 
 This analysis makes several deliberate simplifications:
 
-- **Fully unhedged portfolio.** In practice, most generators hedge 60–90% of expected output via forward contracts or PPAs. The unhedged case represents the maximum spot exposure — the risk baseline against which any hedging strategy is measured.
-- **No balancing costs, grid fees, or curtailment.** Real net revenue is lower than price × generation.
-- **No outages or maintenance.** Generation is modelled as purely weather-driven via the Stage 1 capacity factor models.
-- **Single technology, single zone.** Real portfolios diversify across technologies and geographies — exactly the kind of diversification our cross-zone analysis quantifies.
-- **Historical resampling assumes stationarity.** The simulation draws from 2020–2025 data, which includes the 2022 energy crisis. Risk metrics reflect this full historical range; a forward-looking view might exclude or down-weight the crisis period.
-- **Price model is linear (elastic net).** Extreme prices driven by scarcity events or negative pricing during high-wind periods may be underrepresented. The XGBoost benchmark in Stage 2 captures these non-linearities better but was not used here for interpretability.
+-   **Fully unhedged portfolio.** In practice, most generators hedge 60–90% of expected output via forward contracts or PPAs. The unhedged case represents the maximum spot exposure — the risk baseline against which any hedging strategy is measured.
+-   **No balancing costs, grid fees, or curtailment.** Real net revenue is lower than price × generation.
+-   **No outages or maintenance.** Generation is modelled as purely weather-driven via the Stage 1 capacity factor models.
+-   **Single technology, single zone.** Real portfolios diversify across technologies and geographies — exactly the kind of diversification our cross-zone analysis quantifies.
+-   **Historical resampling and the 2022 energy crisis.** The simulation draws from the full 2020–2025 period, including the 2022 gas price spike. In Variant A (weather-only), this has minimal impact — TTF is fixed at seasonal medians. In Variant B, the 2022 period widens the tails significantly. This is arguably appropriate: risk metrics should reflect scenarios that have actually occurred. The walk-forward cross-validation in Stage 2 confirms the price model generalises across both crisis and non-crisis regimes.
+-   **Price model is linear (elastic net).** Extreme prices driven by scarcity events or negative pricing during high-wind periods may be underrepresented. The XGBoost benchmark in Stage 2 captures these non-linearities better but was not used here for interpretability.
 
 ## 7.3 Data Sources
 
-- **SMARD (Bundesnetzagentur):** DE-LU generation, load, and day-ahead price. [SMARD.de](https://www.smard.de/), CC BY 4.0.
-- **ENTSO-E Transparency Platform:** Multi-zone prices, cross-border flows, and generation by type. Used per ENTSO-E terms of service.
-- **Copernicus ERA5 Reanalysis:** Hourly wind speed and solar irradiance. Hersbach et al. (2020), doi:[10.24381/cds.adbb2d47](https://doi.org/10.24381/cds.adbb2d47).
-- **Yahoo Finance:** TTF natural gas front-month futures (ICE Dutch TTF, EUR/MWh).
+-   **SMARD (Bundesnetzagentur):** DE-LU generation, load, and day-ahead price. [SMARD.de](https://www.smard.de/), CC BY 4.0.
+-   **ENTSO-E Transparency Platform:** Multi-zone prices, cross-border flows, and generation by type. Used per ENTSO-E terms of service.
+-   **Copernicus ERA5 Reanalysis:** Hourly wind speed and solar irradiance. Hersbach et al. (2020), doi:[10.24381/cds.adbb2d47](https://doi.org/10.24381/cds.adbb2d47).
+-   **Yahoo Finance:** TTF natural gas front-month futures (ICE Dutch TTF, EUR/MWh).
