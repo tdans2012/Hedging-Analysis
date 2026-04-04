@@ -135,7 +135,7 @@ compute_cvar <- function(x, level = 0.95) {
 }
 ```
 
-# 1.0 Portfolio Definition {#sec-portfolio}
+# Portfolio Definition {#sec-portfolio}
 
 This analysis quantifies the spot-price revenue risk facing a stylised, fully unhedged renewable energy portfolio in the `r params$portfolio_zone` bidding zone. The portfolio is defined as:
 
@@ -161,9 +161,9 @@ tibble(
 A wind farm that sells all output on the day-ahead spot market earns revenue = price × generation in each delivery hour. Both sides of this equation are weather-driven: wind speed determines generation volume, while the aggregate wind and solar fleet drives the renewable share that (per Stage 2) is the dominant price factor in summer. This creates a **natural short hedge** — high wind hours produce more MWh but depress the price via the merit order effect. The simulation below quantifies how much residual risk remains after this embedded correlation.
 :::
 
-# 2.0 Monte Carlo Framework {#sec-montecarlo}
+# Monte Carlo Framework {#sec-montecarlo}
 
-## 2.1 Feature Engineering {#sec-features}
+## Feature Engineering {#sec-features}
 
 We reconstruct the same feature set used in the Stage 2 price model: renewable share, residual load, net export balance, TTF gas price, hour of day, and season.
 
@@ -249,7 +249,7 @@ cat("Remaining NAs after imputation:\n")
 print(n_remaining_na)
 ```
 
-## 2.2 Predict Prices & Generation {#sec-predict}
+## Predict Prices & Generation {#sec-predict}
 
 We pre-compute predicted prices and portfolio generation for every historical hour before resampling. This keeps the Monte Carlo loop fast — it only needs to sample and sum pre-computed daily revenues.
 
@@ -338,7 +338,7 @@ cat("Mean portfolio generation:",
     round(mean(scenario_df$portfolio_gen_mwh, na.rm = TRUE), 1), "MWh/h\n")
 ```
 
-## 2.3 Daily Revenue Aggregation {#sec-daily}
+## Daily Revenue Aggregation {#sec-daily}
 
 ```{r}
 #| label: daily-revenue
@@ -365,7 +365,7 @@ cat("Days by season:\n")
 print(count(daily_revenue, season))
 ```
 
-## 2.4 Bootstrap Simulation {#sec-bootstrap}
+## Bootstrap Simulation {#sec-bootstrap}
 
 For each season, we construct `r comma(params$n_sim)` synthetic months by sampling `r params$n_days_per_month` days (with replacement) from that season's historical pool. The same sampled days are used for both variants, so the difference between them isolates the contribution of TTF and cross-border flow variability to revenue risk.
 
@@ -411,7 +411,7 @@ cat("Simulation complete:", nrow(sim_results), "rows\n")
 cat("(", n_sim, "simulations ×", n_distinct(sim_results$season), "seasons )\n")
 ```
 
-## 2.5 Variant Comparison {#sec-variant-compare}
+## Variant Comparison {#sec-variant-compare}
 
 ```{r}
 #| label: fig-revenue-distributions
@@ -517,7 +517,7 @@ variant_summary |>
   tab_footnote("SD ratio > 1 indicates additional risk from TTF and cross-border flow variability.")
 ```
 
-# 3.0 Risk Metrics {#sec-risk-metrics}
+# Risk Metrics {#sec-risk-metrics}
 
 How much could a bad month cost? The table below answers that for each season, showing central revenue estimates alongside downside tail risk. VaR tells you the revenue floor you'll stay above in 95% (or 99%) of months. CVaR tells you the average revenue in those worst-case months — it captures how bad "bad" actually gets.
 
@@ -572,11 +572,11 @@ risk_metrics |>
 Pick a row — say Winter. The median month brings in the figure shown under Median. But in the worst 5% of months (CVaR 95%), revenue drops to the CVaR 95% figure. The **Weather Share** column is the key link back to Stage 2: it tells you how much of that revenue swing comes purely from wind variability versus gas and trade flow uncertainty. A low weather share means hedging weather alone won't cover most of your risk.
 :::
 
-# 4.0 Cross-Zone Analysis {#sec-cross-zone}
+# Cross-Zone Analysis {#sec-cross-zone}
 
 Can a generator reduce risk by selling into multiple bidding zones? If prices in different zones move independently, geographic diversification works well. If they move in lockstep — driven by the same weather systems sweeping across Europe — the benefit is limited.
 
-## 4.1 Price Correlation Across European Bidding Zones {#sec-price-corr}
+## Price Correlation Across European Bidding Zones {#sec-price-corr}
 
 ```{r}
 #| label: price-correlation-matrix
@@ -628,7 +628,7 @@ ggplot(cor_long, aes(x = zone_1, y = zone_2, fill = correlation)) +
   )
 ```
 
-## 4.2 Geographic View — Price Linkages Across Europe {#sec-geo-map}
+## Geographic View — Price Linkages Across Europe {#sec-geo-map}
 
 ```{r}
 #| label: fig-zone-correlation-map
@@ -812,7 +812,7 @@ fig |> layout(width = 900, height = 700)
 Zones physically close to Germany (AT, NL, BE) show very high price correlation — their markets are tightly coupled through interconnectors. The Nordic zones (NO, SE, FI) are less correlated, meaning a portfolio spanning both CWE and the Nordics would capture some diversification benefit. But even the lowest correlations are well above zero: no European zone offers a true hedge against German price moves.
 :::
 
-## 4.3 Seasonal Price Correlation {#sec-seasonal-corr}
+## Seasonal Price Correlation {#sec-seasonal-corr}
 
 Price linkages aren't fixed — they shift with season as weather patterns and demand fundamentals change.
 
@@ -853,11 +853,11 @@ ggplot(seasonal_corr, aes(x = reorder(zone, -correlation),
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-# 5.0 `r params$comparison_zone` Comparison {#sec-comparison}
+# `r params$comparison_zone` Comparison {#sec-comparison}
 
 `r params$comparison_zone` serves as a natural comparison to DE-LU. By fitting the same regression structure to a zone with a different generation mix, we can see how market composition shapes the seasonal risk profile.
 
-## 5.1 Feature Engineering {#sec-comp-features}
+## Feature Engineering {#sec-comp-features}
 
 ```{r}
 #| label: comp-feature-engineering
@@ -947,7 +947,7 @@ cat(glue("{comp_zone} scenario table: {nrow(comp_df)} rows, ",
          "{sum(complete.cases(comp_df))} complete cases\n"))
 ```
 
-## 5.2 Seasonal Variance Attribution {#sec-comp-regression}
+## Seasonal Variance Attribution {#sec-comp-regression}
 
 We fit the same model structure as Stage 2 — OLS with the same feature groups — within each season. Partial R² measures how much price variance each feature group explains: drop the feature, see how much R² falls.
 
@@ -1059,9 +1059,9 @@ r2_summary |>
 If `r comp_zone` has higher wind penetration than Germany, we'd expect renewable share to dominate price variance across more seasons — not just summer. Conversely, if gas generation plays a smaller role, TTF should matter less. These structural differences determine what a hedging strategy needs to cover in each market.
 :::
 
-# 6.0 Hedging Implications {#sec-hedging}
+# Hedging Implications {#sec-hedging}
 
-## 6.1 What the Risk Structure Means for Hedging
+## What the Risk Structure Means for Hedging
 
 The analysis above reveals a clear seasonal pattern in what drives revenue risk for a wind portfolio:
 
@@ -1101,7 +1101,7 @@ hedging_df |>
   tab_footnote("Weather-Driven = share of revenue volatility from wind variability; Market-Driven = gas + cross-border flows.")
 ```
 
-## 6.2 Cross-Border Capacity as a Risk Tool {#sec-fca}
+## Cross-Border Capacity as a Risk Tool {#sec-fca}
 
 The ENTSO-E [Forward Capacity Allocation (FCA) regulation](https://www.entsoe.eu/network_codes/fca/) governs how cross-border transmission rights are allocated — the framework that determines whether generators can actually access neighbouring markets for hedging purposes.
 
@@ -1119,9 +1119,9 @@ Our cross-zone analysis shows why this matters:
 Forward capacity allocation isn't just a grid operations question — it's a risk management tool. The FCA framework directly affects whether renewable generators can access the cross-border diversification that our correlation analysis shows exists in the Nordics. Market participants bidding for long-term transmission rights should account for the seasonal correlation structure documented here.
 :::
 
-# 7.0 Technical Notes {#sec-appendix}
+# Technical Notes {#sec-appendix}
 
-## 7.1 Simulation Convergence {#sec-convergence}
+## Simulation Convergence {#sec-convergence}
 
 Are `r comma(params$n_sim)` simulations enough for stable risk estimates? The plot below shows how CVaR 95% stabilises as the number of draws increases.
 
@@ -1163,7 +1163,7 @@ ggplot(convergence, aes(x = running_n, y = running_cvar)) +
   )
 ```
 
-## 7.2 Assumptions & Limitations
+## Assumptions & Limitations
 
 This analysis makes several deliberate simplifications:
 
@@ -1174,7 +1174,7 @@ This analysis makes several deliberate simplifications:
 -   **Historical resampling and the 2022 energy crisis.** The simulation draws from the full 2020–2025 period, including the 2022 gas price spike. In Variant A (weather-only), this has minimal impact — TTF is fixed at seasonal medians. In Variant B, the 2022 period widens the tails significantly. This is arguably appropriate: risk metrics should reflect scenarios that have actually occurred. The walk-forward cross-validation in Stage 2 confirms the price model generalises across both crisis and non-crisis regimes.
 -   **Price model is linear (elastic net).** Extreme prices driven by scarcity events or negative pricing during high-wind periods may be underrepresented. The XGBoost benchmark in Stage 2 captures these non-linearities better but was not used here for interpretability.
 
-## 7.3 Data Sources
+## Data Sources
 
 -   **SMARD (Bundesnetzagentur):** DE-LU generation, load, and day-ahead price. [SMARD.de](https://www.smard.de/), CC BY 4.0.
 -   **ENTSO-E Transparency Platform:** Multi-zone prices, cross-border flows, and generation by type. Used per ENTSO-E terms of service.

@@ -4,6 +4,10 @@ subtitle: "Cross-zone weather profiles and DE-LU capacity factor models"
 params:
   analysis_year_start: 2020
   analysis_year_end: 2025
+format:
+  html:
+    code-fold: true
+    code-summary: "Show code"
 execute:
   warning: false
   message: false

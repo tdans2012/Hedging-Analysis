@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Risk Quantification &amp; Hedging Implications – Renewable Variability &amp; Electricity Price Risk</title>
+<title>Risk Quantification &amp; Hedging Implications</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -58,166 +58,81 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<script src="site_libs/quarto-html/quarto.js" type="module"></script>
-<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<script src="site_libs/quarto-html/anchor.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-1d4f84655f446305ac42a8f1abcf7405.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
-<script id="quarto-search-options" type="application/json">{
-  "location": "navbar",
-  "copy-button": false,
-  "collapse-after": 3,
-  "panel-placement": "end",
-  "type": "overlay",
-  "limit": 50,
-  "keyboard-shortcut": [
-    "f",
-    "/",
-    "s"
-  ],
-  "show-item-context": false,
-  "language": {
-    "search-no-results-text": "No results",
-    "search-matching-documents-text": "matching documents",
-    "search-copy-link-title": "Copy link to search",
-    "search-hide-matches-text": "Hide additional matches",
-    "search-more-match-text": "more match in this document",
-    "search-more-matches-text": "more matches in this document",
-    "search-clear-button-title": "Clear",
-    "search-text-placeholder": "",
-    "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit",
-    "search-label": "Search"
-  }
-}</script>
-<script src="site_libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
+<script src="04_risk_files/libs/clipboard/clipboard.min.js"></script>
+<script src="04_risk_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="04_risk_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="04_risk_files/libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="04_risk_files/libs/quarto-html/popper.min.js"></script>
+<script src="04_risk_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="04_risk_files/libs/quarto-html/anchor.min.js"></script>
+<link href="04_risk_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="04_risk_files/libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="04_risk_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="04_risk_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="04_risk_files/libs/bootstrap/bootstrap-9e3ffae467580fdb927a41352e75a2e0.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script src="04_risk_files/libs/htmlwidgets-1.6.4/htmlwidgets.js"></script>
 
-<script src="site_libs/plotly-binding-4.12.0/plotly.js"></script>
+<script src="04_risk_files/libs/plotly-binding-4.12.0/plotly.js"></script>
 
-<script src="site_libs/typedarray-0.1/typedarray.min.js"></script>
+<script src="04_risk_files/libs/typedarray-0.1/typedarray.min.js"></script>
 
-<script src="site_libs/jquery-3.5.1/jquery.min.js"></script>
+<script src="04_risk_files/libs/jquery-3.5.1/jquery.min.js"></script>
 
-<link href="site_libs/crosstalk-1.2.2/css/crosstalk.min.css" rel="stylesheet">
+<link href="04_risk_files/libs/crosstalk-1.2.2/css/crosstalk.min.css" rel="stylesheet">
 
-<script src="site_libs/crosstalk-1.2.2/js/crosstalk.min.js"></script>
+<script src="04_risk_files/libs/crosstalk-1.2.2/js/crosstalk.min.js"></script>
 
-<link href="site_libs/plotly-htmlwidgets-css-2.25.2/plotly-htmlwidgets.css" rel="stylesheet">
+<link href="04_risk_files/libs/plotly-htmlwidgets-css-2.25.2/plotly-htmlwidgets.css" rel="stylesheet">
 
-<script src="site_libs/plotly-main-2.25.2/plotly-latest.min.js"></script>
+<script src="04_risk_files/libs/plotly-main-2.25.2/plotly-latest.min.js"></script>
 
 
 
 </head>
 
-<body class="nav-fixed quarto-light">
+<body class="quarto-light">
 
-<div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top">
-    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
-      <div class="navbar-container container-fluid">
-      <div class="navbar-brand-container mx-auto">
-    <a href="./index.html" class="navbar-brand navbar-brand-logo">
-    </a>
-    <a class="navbar-brand" href="./index.html">
-    <span class="navbar-title">Renewable Variability &amp; Electricity Price Risk</span>
-    </a>
-  </div>
-            <div id="quarto-search" class="" title="Search"></div>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
-  <span class="navbar-toggler-icon"></span>
-</button>
-          <div class="collapse navbar-collapse" id="navbarCollapse">
-            <ul class="navbar-nav navbar-nav-scroll me-auto">
-  <li class="nav-item">
-    <a class="nav-link" href="./index.html"> 
-<span class="menu-text">Overview</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./01_data.html"> 
-<span class="menu-text">1. Data</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./02_weather.html"> 
-<span class="menu-text">2. Weather → Generation</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./03_prices.html"> 
-<span class="menu-text">3. Price Decomposition</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link active" href="./04_risk.html" aria-current="page"> 
-<span class="menu-text">4. Risk &amp; Hedging</span></a>
-  </li>  
-  <li class="nav-item">
-    <a class="nav-link" href="./about.html"> 
-<span class="menu-text">About</span></a>
-  </li>  
-</ul>
-          </div> <!-- /navcollapse -->
-            <div class="quarto-navbar-tools">
-</div>
-      </div> <!-- /container-fluid -->
-    </nav>
-</header>
-<!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
-<!-- sidebar -->
-<!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
-        <nav id="TOC" role="doc-toc" class="toc-active">
-    <h2 id="toc-title">On this page</h2>
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#sec-portfolio" id="toc-sec-portfolio" class="nav-link active" data-scroll-target="#sec-portfolio"><span class="header-section-number">1</span> 1.0 Portfolio Definition</a></li>
-  <li><a href="#sec-montecarlo" id="toc-sec-montecarlo" class="nav-link" data-scroll-target="#sec-montecarlo"><span class="header-section-number">2</span> 2.0 Monte Carlo Framework</a>
+  <li><a href="#sec-portfolio" id="toc-sec-portfolio" class="nav-link active" data-scroll-target="#sec-portfolio"><span class="header-section-number">1</span> Portfolio Definition</a></li>
+  <li><a href="#sec-montecarlo" id="toc-sec-montecarlo" class="nav-link" data-scroll-target="#sec-montecarlo"><span class="header-section-number">2</span> Monte Carlo Framework</a>
   <ul class="collapse">
-  <li><a href="#sec-features" id="toc-sec-features" class="nav-link" data-scroll-target="#sec-features"><span class="header-section-number">2.1</span> 2.1 Feature Engineering</a></li>
-  <li><a href="#sec-predict" id="toc-sec-predict" class="nav-link" data-scroll-target="#sec-predict"><span class="header-section-number">2.2</span> 2.2 Predict Prices &amp; Generation</a></li>
-  <li><a href="#sec-daily" id="toc-sec-daily" class="nav-link" data-scroll-target="#sec-daily"><span class="header-section-number">2.3</span> 2.3 Daily Revenue Aggregation</a></li>
-  <li><a href="#sec-bootstrap" id="toc-sec-bootstrap" class="nav-link" data-scroll-target="#sec-bootstrap"><span class="header-section-number">2.4</span> 2.4 Bootstrap Simulation</a></li>
-  <li><a href="#sec-variant-compare" id="toc-sec-variant-compare" class="nav-link" data-scroll-target="#sec-variant-compare"><span class="header-section-number">2.5</span> 2.5 Variant Comparison</a></li>
+  <li><a href="#sec-features" id="toc-sec-features" class="nav-link" data-scroll-target="#sec-features"><span class="header-section-number">2.1</span> Feature Engineering</a></li>
+  <li><a href="#sec-predict" id="toc-sec-predict" class="nav-link" data-scroll-target="#sec-predict"><span class="header-section-number">2.2</span> Predict Prices &amp; Generation</a></li>
+  <li><a href="#sec-daily" id="toc-sec-daily" class="nav-link" data-scroll-target="#sec-daily"><span class="header-section-number">2.3</span> Daily Revenue Aggregation</a></li>
+  <li><a href="#sec-bootstrap" id="toc-sec-bootstrap" class="nav-link" data-scroll-target="#sec-bootstrap"><span class="header-section-number">2.4</span> Bootstrap Simulation</a></li>
+  <li><a href="#sec-variant-compare" id="toc-sec-variant-compare" class="nav-link" data-scroll-target="#sec-variant-compare"><span class="header-section-number">2.5</span> Variant Comparison</a></li>
   </ul></li>
-  <li><a href="#sec-risk-metrics" id="toc-sec-risk-metrics" class="nav-link" data-scroll-target="#sec-risk-metrics"><span class="header-section-number">3</span> 3.0 Risk Metrics</a></li>
-  <li><a href="#sec-cross-zone" id="toc-sec-cross-zone" class="nav-link" data-scroll-target="#sec-cross-zone"><span class="header-section-number">4</span> 4.0 Cross-Zone Analysis</a>
+  <li><a href="#sec-risk-metrics" id="toc-sec-risk-metrics" class="nav-link" data-scroll-target="#sec-risk-metrics"><span class="header-section-number">3</span> Risk Metrics</a></li>
+  <li><a href="#sec-cross-zone" id="toc-sec-cross-zone" class="nav-link" data-scroll-target="#sec-cross-zone"><span class="header-section-number">4</span> Cross-Zone Analysis</a>
   <ul class="collapse">
-  <li><a href="#sec-price-corr" id="toc-sec-price-corr" class="nav-link" data-scroll-target="#sec-price-corr"><span class="header-section-number">4.1</span> 4.1 Price Correlation Across European Bidding Zones</a></li>
-  <li><a href="#sec-geo-map" id="toc-sec-geo-map" class="nav-link" data-scroll-target="#sec-geo-map"><span class="header-section-number">4.2</span> 4.2 Geographic View — Price Linkages Across Europe</a></li>
-  <li><a href="#sec-seasonal-corr" id="toc-sec-seasonal-corr" class="nav-link" data-scroll-target="#sec-seasonal-corr"><span class="header-section-number">4.3</span> 4.3 Seasonal Price Correlation</a></li>
+  <li><a href="#sec-price-corr" id="toc-sec-price-corr" class="nav-link" data-scroll-target="#sec-price-corr"><span class="header-section-number">4.1</span> Price Correlation Across European Bidding Zones</a></li>
+  <li><a href="#sec-geo-map" id="toc-sec-geo-map" class="nav-link" data-scroll-target="#sec-geo-map"><span class="header-section-number">4.2</span> Geographic View — Price Linkages Across Europe</a></li>
+  <li><a href="#sec-seasonal-corr" id="toc-sec-seasonal-corr" class="nav-link" data-scroll-target="#sec-seasonal-corr"><span class="header-section-number">4.3</span> Seasonal Price Correlation</a></li>
   </ul></li>
-  <li><a href="#sec-comparison" id="toc-sec-comparison" class="nav-link" data-scroll-target="#sec-comparison"><span class="header-section-number">5</span> 5.0 DK_1 Comparison</a>
+  <li><a href="#sec-comparison" id="toc-sec-comparison" class="nav-link" data-scroll-target="#sec-comparison"><span class="header-section-number">5</span> DK_1 Comparison</a>
   <ul class="collapse">
-  <li><a href="#sec-comp-features" id="toc-sec-comp-features" class="nav-link" data-scroll-target="#sec-comp-features"><span class="header-section-number">5.1</span> 5.1 Feature Engineering</a></li>
-  <li><a href="#sec-comp-regression" id="toc-sec-comp-regression" class="nav-link" data-scroll-target="#sec-comp-regression"><span class="header-section-number">5.2</span> 5.2 Seasonal Variance Attribution</a></li>
+  <li><a href="#sec-comp-features" id="toc-sec-comp-features" class="nav-link" data-scroll-target="#sec-comp-features"><span class="header-section-number">5.1</span> Feature Engineering</a></li>
+  <li><a href="#sec-comp-regression" id="toc-sec-comp-regression" class="nav-link" data-scroll-target="#sec-comp-regression"><span class="header-section-number">5.2</span> Seasonal Variance Attribution</a></li>
   </ul></li>
-  <li><a href="#sec-hedging" id="toc-sec-hedging" class="nav-link" data-scroll-target="#sec-hedging"><span class="header-section-number">6</span> 6.0 Hedging Implications</a>
+  <li><a href="#sec-hedging" id="toc-sec-hedging" class="nav-link" data-scroll-target="#sec-hedging"><span class="header-section-number">6</span> Hedging Implications</a>
   <ul class="collapse">
-  <li><a href="#what-the-risk-structure-means-for-hedging" id="toc-what-the-risk-structure-means-for-hedging" class="nav-link" data-scroll-target="#what-the-risk-structure-means-for-hedging"><span class="header-section-number">6.1</span> 6.1 What the Risk Structure Means for Hedging</a></li>
-  <li><a href="#sec-fca" id="toc-sec-fca" class="nav-link" data-scroll-target="#sec-fca"><span class="header-section-number">6.2</span> 6.2 Cross-Border Capacity as a Risk Tool</a></li>
+  <li><a href="#what-the-risk-structure-means-for-hedging" id="toc-what-the-risk-structure-means-for-hedging" class="nav-link" data-scroll-target="#what-the-risk-structure-means-for-hedging"><span class="header-section-number">6.1</span> What the Risk Structure Means for Hedging</a></li>
+  <li><a href="#sec-fca" id="toc-sec-fca" class="nav-link" data-scroll-target="#sec-fca"><span class="header-section-number">6.2</span> Cross-Border Capacity as a Risk Tool</a></li>
   </ul></li>
-  <li><a href="#sec-appendix" id="toc-sec-appendix" class="nav-link" data-scroll-target="#sec-appendix"><span class="header-section-number">7</span> 7.0 Technical Notes</a>
+  <li><a href="#sec-appendix" id="toc-sec-appendix" class="nav-link" data-scroll-target="#sec-appendix"><span class="header-section-number">7</span> Technical Notes</a>
   <ul class="collapse">
-  <li><a href="#sec-convergence" id="toc-sec-convergence" class="nav-link" data-scroll-target="#sec-convergence"><span class="header-section-number">7.1</span> 7.1 Simulation Convergence</a></li>
-  <li><a href="#assumptions-limitations" id="toc-assumptions-limitations" class="nav-link" data-scroll-target="#assumptions-limitations"><span class="header-section-number">7.2</span> 7.2 Assumptions &amp; Limitations</a></li>
-  <li><a href="#data-sources" id="toc-data-sources" class="nav-link" data-scroll-target="#data-sources"><span class="header-section-number">7.3</span> 7.3 Data Sources</a></li>
+  <li><a href="#sec-convergence" id="toc-sec-convergence" class="nav-link" data-scroll-target="#sec-convergence"><span class="header-section-number">7.1</span> Simulation Convergence</a></li>
+  <li><a href="#assumptions-limitations" id="toc-assumptions-limitations" class="nav-link" data-scroll-target="#assumptions-limitations"><span class="header-section-number">7.2</span> Assumptions &amp; Limitations</a></li>
+  <li><a href="#data-sources" id="toc-data-sources" class="nav-link" data-scroll-target="#data-sources"><span class="header-section-number">7.3</span> Data Sources</a></li>
   </ul></li>
   </ul>
 </nav>
-    </div>
-<!-- main -->
+</div>
 <main class="content" id="quarto-document-content">
 
 <header id="title-block-header" class="quarto-title-block default">
@@ -240,7 +155,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 <section id="sec-portfolio" class="level1" data-number="1">
-<h1 data-number="1"><span class="header-section-number">1</span> 1.0 Portfolio Definition</h1>
+<h1 data-number="1"><span class="header-section-number">1</span> Portfolio Definition</h1>
 <p>This analysis quantifies the spot-price revenue risk facing a stylised, fully unhedged renewable energy portfolio in the DE-LU bidding zone. The portfolio is defined as:</p>
 <div class="cell">
 <details class="code-fold">
@@ -258,23 +173,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cols_align</span>(<span class="at">align =</span> <span class="st">"left"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output-display">
-<div id="awdqxyytkd" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#awdqxyytkd table {
+<div id="qkjkbofaqc" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#qkjkbofaqc table {
   font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#awdqxyytkd thead, #awdqxyytkd tbody, #awdqxyytkd tfoot, #awdqxyytkd tr, #awdqxyytkd td, #awdqxyytkd th {
+#qkjkbofaqc thead, #qkjkbofaqc tbody, #qkjkbofaqc tfoot, #qkjkbofaqc tr, #qkjkbofaqc td, #qkjkbofaqc th {
   border-style: none;
 }
 
-#awdqxyytkd p {
+#qkjkbofaqc p {
   margin: 0;
   padding: 0;
 }
 
-#awdqxyytkd .gt_table {
+#qkjkbofaqc .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -300,12 +215,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-left-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_caption {
+#qkjkbofaqc .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#awdqxyytkd .gt_title {
+#qkjkbofaqc .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -317,7 +232,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-width: 0;
 }
 
-#awdqxyytkd .gt_subtitle {
+#qkjkbofaqc .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -329,7 +244,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-width: 0;
 }
 
-#awdqxyytkd .gt_heading {
+#qkjkbofaqc .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -341,13 +256,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_bottom_border {
+#qkjkbofaqc .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_col_headings {
+#qkjkbofaqc .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -362,7 +277,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_col_heading {
+#qkjkbofaqc .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -382,7 +297,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#awdqxyytkd .gt_column_spanner_outer {
+#qkjkbofaqc .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -394,15 +309,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 4px;
 }
 
-#awdqxyytkd .gt_column_spanner_outer:first-child {
+#qkjkbofaqc .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#awdqxyytkd .gt_column_spanner_outer:last-child {
+#qkjkbofaqc .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#awdqxyytkd .gt_column_spanner {
+#qkjkbofaqc .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -414,11 +329,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   width: 100%;
 }
 
-#awdqxyytkd .gt_spanner_row {
+#qkjkbofaqc .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#awdqxyytkd .gt_group_heading {
+#qkjkbofaqc .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -444,7 +359,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   text-align: left;
 }
 
-#awdqxyytkd .gt_empty_group_heading {
+#qkjkbofaqc .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -459,15 +374,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: middle;
 }
 
-#awdqxyytkd .gt_from_md > :first-child {
+#qkjkbofaqc .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#awdqxyytkd .gt_from_md > :last-child {
+#qkjkbofaqc .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#awdqxyytkd .gt_row {
+#qkjkbofaqc .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -486,7 +401,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#awdqxyytkd .gt_stub {
+#qkjkbofaqc .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -499,7 +414,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#awdqxyytkd .gt_stub_row_group {
+#qkjkbofaqc .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -513,15 +428,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: top;
 }
 
-#awdqxyytkd .gt_row_group_first td {
+#qkjkbofaqc .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#awdqxyytkd .gt_row_group_first th {
+#qkjkbofaqc .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#awdqxyytkd .gt_summary_row {
+#qkjkbofaqc .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -531,16 +446,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#awdqxyytkd .gt_first_summary_row {
+#qkjkbofaqc .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_first_summary_row.thick {
+#qkjkbofaqc .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#awdqxyytkd .gt_last_summary_row {
+#qkjkbofaqc .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -550,7 +465,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_grand_summary_row {
+#qkjkbofaqc .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -560,7 +475,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#awdqxyytkd .gt_first_grand_summary_row {
+#qkjkbofaqc .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -570,7 +485,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_last_grand_summary_row_top {
+#qkjkbofaqc .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -580,11 +495,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_striped {
+#qkjkbofaqc .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#awdqxyytkd .gt_table_body {
+#qkjkbofaqc .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -593,7 +508,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_footnotes {
+#qkjkbofaqc .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -607,7 +522,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_footnote {
+#qkjkbofaqc .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -616,7 +531,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#awdqxyytkd .gt_sourcenotes {
+#qkjkbofaqc .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -630,7 +545,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#awdqxyytkd .gt_sourcenote {
+#qkjkbofaqc .gt_sourcenote {
   font-size: 90%;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -638,72 +553,72 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#awdqxyytkd .gt_left {
+#qkjkbofaqc .gt_left {
   text-align: left;
 }
 
-#awdqxyytkd .gt_center {
+#qkjkbofaqc .gt_center {
   text-align: center;
 }
 
-#awdqxyytkd .gt_right {
+#qkjkbofaqc .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#awdqxyytkd .gt_font_normal {
+#qkjkbofaqc .gt_font_normal {
   font-weight: normal;
 }
 
-#awdqxyytkd .gt_font_bold {
+#qkjkbofaqc .gt_font_bold {
   font-weight: bold;
 }
 
-#awdqxyytkd .gt_font_italic {
+#qkjkbofaqc .gt_font_italic {
   font-style: italic;
 }
 
-#awdqxyytkd .gt_super {
+#qkjkbofaqc .gt_super {
   font-size: 65%;
 }
 
-#awdqxyytkd .gt_footnote_marks {
+#qkjkbofaqc .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#awdqxyytkd .gt_asterisk {
+#qkjkbofaqc .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#awdqxyytkd .gt_indent_1 {
+#qkjkbofaqc .gt_indent_1 {
   text-indent: 5px;
 }
 
-#awdqxyytkd .gt_indent_2 {
+#qkjkbofaqc .gt_indent_2 {
   text-indent: 10px;
 }
 
-#awdqxyytkd .gt_indent_3 {
+#qkjkbofaqc .gt_indent_3 {
   text-indent: 15px;
 }
 
-#awdqxyytkd .gt_indent_4 {
+#qkjkbofaqc .gt_indent_4 {
   text-indent: 20px;
 }
 
-#awdqxyytkd .gt_indent_5 {
+#qkjkbofaqc .gt_indent_5 {
   text-indent: 25px;
 }
 
-#awdqxyytkd .katex-display {
+#qkjkbofaqc .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#awdqxyytkd div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#qkjkbofaqc div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 </style>
@@ -764,9 +679,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </section>
 <section id="sec-montecarlo" class="level1" data-number="2">
-<h1 data-number="2"><span class="header-section-number">2</span> 2.0 Monte Carlo Framework</h1>
+<h1 data-number="2"><span class="header-section-number">2</span> Monte Carlo Framework</h1>
 <section id="sec-features" class="level2" data-number="2.1">
-<h2 data-number="2.1" class="anchored" data-anchor-id="sec-features"><span class="header-section-number">2.1</span> 2.1 Feature Engineering</h2>
+<h2 data-number="2.1" class="anchored" data-anchor-id="sec-features"><span class="header-section-number">2.1</span> Feature Engineering</h2>
 <p>We reconstruct the same feature set used in the Stage 2 price model: renewable share, residual load, net export balance, TTF gas price, hour of day, and season.</p>
 <div class="cell">
 <details class="code-fold">
@@ -865,7 +780,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </section>
 <section id="sec-predict" class="level2" data-number="2.2">
-<h2 data-number="2.2" class="anchored" data-anchor-id="sec-predict"><span class="header-section-number">2.2</span> 2.2 Predict Prices &amp; Generation</h2>
+<h2 data-number="2.2" class="anchored" data-anchor-id="sec-predict"><span class="header-section-number">2.2</span> Predict Prices &amp; Generation</h2>
 <p>We pre-compute predicted prices and portfolio generation for every historical hour before resampling. This keeps the Monte Carlo loop fast — it only needs to sample and sum pre-computed daily revenues.</p>
 <p><strong>Variant A (weather-only):</strong> TTF and net export balance fixed at their seasonal medians. Isolates the pure weather-driven component of price risk.</p>
 <p><strong>Variant B (full historical):</strong> All features drawn from the same historical day. Captures total risk including gas price and cross-border flow co-movement.</p>
@@ -892,23 +807,23 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tab_header</span>(<span class="at">title =</span> <span class="st">"Conditional Values for Weather-Only Variant"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output-display">
-<div id="fygpykcyyf" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
-<style>#fygpykcyyf table {
+<div id="orabvnanbr" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>#orabvnanbr table {
   font-family: system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-#fygpykcyyf thead, #fygpykcyyf tbody, #fygpykcyyf tfoot, #fygpykcyyf tr, #fygpykcyyf td, #fygpykcyyf th {
+#orabvnanbr thead, #orabvnanbr tbody, #orabvnanbr tfoot, #orabvnanbr tr, #orabvnanbr td, #orabvnanbr th {
   border-style: none;
 }
 
-#fygpykcyyf p {
+#orabvnanbr p {
   margin: 0;
   padding: 0;
 }
 
-#fygpykcyyf .gt_table {
+#orabvnanbr .gt_table {
   display: table;
   border-collapse: collapse;
   line-height: normal;
@@ -934,12 +849,12 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-left-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_caption {
+#orabvnanbr .gt_caption {
   padding-top: 4px;
   padding-bottom: 4px;
 }
 
-#fygpykcyyf .gt_title {
+#orabvnanbr .gt_title {
   color: #333333;
   font-size: 125%;
   font-weight: initial;
@@ -951,7 +866,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-width: 0;
 }
 
-#fygpykcyyf .gt_subtitle {
+#orabvnanbr .gt_subtitle {
   color: #333333;
   font-size: 85%;
   font-weight: initial;
@@ -963,7 +878,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-width: 0;
 }
 
-#fygpykcyyf .gt_heading {
+#orabvnanbr .gt_heading {
   background-color: #FFFFFF;
   text-align: center;
   border-bottom-color: #FFFFFF;
@@ -975,13 +890,13 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_bottom_border {
+#orabvnanbr .gt_bottom_border {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_col_headings {
+#orabvnanbr .gt_col_headings {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -996,7 +911,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_col_heading {
+#orabvnanbr .gt_col_heading {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1016,7 +931,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#fygpykcyyf .gt_column_spanner_outer {
+#orabvnanbr .gt_column_spanner_outer {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1028,15 +943,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 4px;
 }
 
-#fygpykcyyf .gt_column_spanner_outer:first-child {
+#orabvnanbr .gt_column_spanner_outer:first-child {
   padding-left: 0;
 }
 
-#fygpykcyyf .gt_column_spanner_outer:last-child {
+#orabvnanbr .gt_column_spanner_outer:last-child {
   padding-right: 0;
 }
 
-#fygpykcyyf .gt_column_spanner {
+#orabvnanbr .gt_column_spanner {
   border-bottom-style: solid;
   border-bottom-width: 2px;
   border-bottom-color: #D3D3D3;
@@ -1048,11 +963,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   width: 100%;
 }
 
-#fygpykcyyf .gt_spanner_row {
+#orabvnanbr .gt_spanner_row {
   border-bottom-style: hidden;
 }
 
-#fygpykcyyf .gt_group_heading {
+#orabvnanbr .gt_group_heading {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1078,7 +993,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   text-align: left;
 }
 
-#fygpykcyyf .gt_empty_group_heading {
+#orabvnanbr .gt_empty_group_heading {
   padding: 0.5px;
   color: #333333;
   background-color: #FFFFFF;
@@ -1093,15 +1008,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: middle;
 }
 
-#fygpykcyyf .gt_from_md > :first-child {
+#orabvnanbr .gt_from_md > :first-child {
   margin-top: 0;
 }
 
-#fygpykcyyf .gt_from_md > :last-child {
+#orabvnanbr .gt_from_md > :last-child {
   margin-bottom: 0;
 }
 
-#fygpykcyyf .gt_row {
+#orabvnanbr .gt_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1120,7 +1035,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   overflow-x: hidden;
 }
 
-#fygpykcyyf .gt_stub {
+#orabvnanbr .gt_stub {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1133,7 +1048,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#fygpykcyyf .gt_stub_row_group {
+#orabvnanbr .gt_stub_row_group {
   color: #333333;
   background-color: #FFFFFF;
   font-size: 100%;
@@ -1147,15 +1062,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   vertical-align: top;
 }
 
-#fygpykcyyf .gt_row_group_first td {
+#orabvnanbr .gt_row_group_first td {
   border-top-width: 2px;
 }
 
-#fygpykcyyf .gt_row_group_first th {
+#orabvnanbr .gt_row_group_first th {
   border-top-width: 2px;
 }
 
-#fygpykcyyf .gt_summary_row {
+#orabvnanbr .gt_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -1165,16 +1080,16 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#fygpykcyyf .gt_first_summary_row {
+#orabvnanbr .gt_first_summary_row {
   border-top-style: solid;
   border-top-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_first_summary_row.thick {
+#orabvnanbr .gt_first_summary_row.thick {
   border-top-width: 2px;
 }
 
-#fygpykcyyf .gt_last_summary_row {
+#orabvnanbr .gt_last_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1184,7 +1099,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_grand_summary_row {
+#orabvnanbr .gt_grand_summary_row {
   color: #333333;
   background-color: #FFFFFF;
   text-transform: inherit;
@@ -1194,7 +1109,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#fygpykcyyf .gt_first_grand_summary_row {
+#orabvnanbr .gt_first_grand_summary_row {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1204,7 +1119,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-top-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_last_grand_summary_row_top {
+#orabvnanbr .gt_last_grand_summary_row_top {
   padding-top: 8px;
   padding-bottom: 8px;
   padding-left: 5px;
@@ -1214,11 +1129,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_striped {
+#orabvnanbr .gt_striped {
   background-color: rgba(128, 128, 128, 0.05);
 }
 
-#fygpykcyyf .gt_table_body {
+#orabvnanbr .gt_table_body {
   border-top-style: solid;
   border-top-width: 2px;
   border-top-color: #D3D3D3;
@@ -1227,7 +1142,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-bottom-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_footnotes {
+#orabvnanbr .gt_footnotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -1241,7 +1156,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_footnote {
+#orabvnanbr .gt_footnote {
   margin: 0px;
   font-size: 90%;
   padding-top: 4px;
@@ -1250,7 +1165,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#fygpykcyyf .gt_sourcenotes {
+#orabvnanbr .gt_sourcenotes {
   color: #333333;
   background-color: #FFFFFF;
   border-bottom-style: none;
@@ -1264,7 +1179,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   border-right-color: #D3D3D3;
 }
 
-#fygpykcyyf .gt_sourcenote {
+#orabvnanbr .gt_sourcenote {
   font-size: 90%;
   padding-top: 4px;
   padding-bottom: 4px;
@@ -1272,72 +1187,72 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
   padding-right: 5px;
 }
 
-#fygpykcyyf .gt_left {
+#orabvnanbr .gt_left {
   text-align: left;
 }
 
-#fygpykcyyf .gt_center {
+#orabvnanbr .gt_center {
   text-align: center;
 }
 
-#fygpykcyyf .gt_right {
+#orabvnanbr .gt_right {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-#fygpykcyyf .gt_font_normal {
+#orabvnanbr .gt_font_normal {
   font-weight: normal;
 }
 
-#fygpykcyyf .gt_font_bold {
+#orabvnanbr .gt_font_bold {
   font-weight: bold;
 }
 
-#fygpykcyyf .gt_font_italic {
+#orabvnanbr .gt_font_italic {
   font-style: italic;
 }
 
-#fygpykcyyf .gt_super {
+#orabvnanbr .gt_super {
   font-size: 65%;
 }
 
-#fygpykcyyf .gt_footnote_marks {
+#orabvnanbr .gt_footnote_marks {
   font-size: 75%;
   vertical-align: 0.4em;
   position: initial;
 }
 
-#fygpykcyyf .gt_asterisk {
+#orabvnanbr .gt_asterisk {
   font-size: 100%;
   vertical-align: 0;
 }
 
-#fygpykcyyf .gt_indent_1 {
+#orabvnanbr .gt_indent_1 {
   text-indent: 5px;
 }
 
-#fygpykcyyf .gt_indent_2 {
+#orabvnanbr .gt_indent_2 {
   text-indent: 10px;
 }
 
-#fygpykcyyf .gt_indent_3 {
+#orabvnanbr .gt_indent_3 {
   text-indent: 15px;
 }
 
-#fygpykcyyf .gt_indent_4 {
+#orabvnanbr .gt_indent_4 {
   text-indent: 20px;
 }
 
-#fygpykcyyf .gt_indent_5 {
+#orabvnanbr .gt_indent_5 {
   text-indent: 25px;
 }
 
-#fygpykcyyf .katex-display {
+#orabvnanbr .katex-display {
   display: inline-flex !important;
   margin-bottom: 0.75em !important;
 }
 
-#fygpykcyyf div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
+#orabvnanbr div.Reactable > div.rt-table > div.rt-thead > div.rt-tr.rt-tr-group-header > div.rt-th-group:after {
   height: 0px !important;
 }
 </style>
@@ -1447,7 +1362,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </section>
 <section id="sec-daily" class="level2" data-number="2.3">
-<h2 data-number="2.3" class="anchored" data-anchor-id="sec-daily"><span class="header-section-number">2.3</span> 2.3 Daily Revenue Aggregation</h2>
+<h2 data-number="2.3" class="anchored" data-anchor-id="sec-daily"><span class="header-section-number">2.3</span> Daily Revenue Aggregation</h2>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -1495,7 +1410,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </section>
 <section id="sec-bootstrap" class="level2" data-number="2.4">
-<h2 data-number="2.4" class="anchored" data-anchor-id="sec-bootstrap"><span class="header-section-number">2.4</span> 2.4 Bootstrap Simulation</h2>
+<h2 data-number="2.4" class="anchored" data-anchor-id="sec-bootstrap"><span class="header-section-number">2.4</span> Bootstrap Simulation</h2>
 <p>For each season, we construct 10,000 synthetic months by sampling 30 days (with replacement) from that season’s historical pool. The same sampled days are used for both variants, so the difference between them isolates the contribution of TTF and cross-border flow variability to revenue risk.</p>
 <div class="cell">
 <details class="code-fold">
@@ -1549,7 +1464,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 </section>
 <section id="sec-variant-compare" class="level2" data-number="2.5">
-<h2 data-number="2.5" class="anchored" data-anchor-id="sec-variant-compare"><span class="header-section-number">2.5</span> 2.5 Variant Comparison</h2>
+<h2 data-number="2.5" class="anchored" data-anchor-id="sec-variant-compare"><span class="header-section-number">2.5</span> Variant Comparison</h2>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -2189,7 +2104,7 @@ Figure&nbsp;2: Simulated average monthly price by season and variant
 </section>
 </section>
 <section id="sec-risk-metrics" class="level1" data-number="3">
-<h1 data-number="3"><span class="header-section-number">3</span> 3.0 Risk Metrics</h1>
+<h1 data-number="3"><span class="header-section-number">3</span> Risk Metrics</h1>
 <p>How much could a bad month cost? The table below answers that for each season, showing central revenue estimates alongside downside tail risk. VaR tells you the revenue floor you’ll stay above in 95% (or 99%) of months. CVaR tells you the average revenue in those worst-case months — it captures how bad “bad” actually gets.</p>
 <div class="cell">
 <details class="code-fold">
@@ -2799,10 +2714,10 @@ Downside Risk
 </div>
 </section>
 <section id="sec-cross-zone" class="level1" data-number="4">
-<h1 data-number="4"><span class="header-section-number">4</span> 4.0 Cross-Zone Analysis</h1>
+<h1 data-number="4"><span class="header-section-number">4</span> Cross-Zone Analysis</h1>
 <p>Can a generator reduce risk by selling into multiple bidding zones? If prices in different zones move independently, geographic diversification works well. If they move in lockstep — driven by the same weather systems sweeping across Europe — the benefit is limited.</p>
 <section id="sec-price-corr" class="level2" data-number="4.1">
-<h2 data-number="4.1" class="anchored" data-anchor-id="sec-price-corr"><span class="header-section-number">4.1</span> 4.1 Price Correlation Across European Bidding Zones</h2>
+<h2 data-number="4.1" class="anchored" data-anchor-id="sec-price-corr"><span class="header-section-number">4.1</span> Price Correlation Across European Bidding Zones</h2>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -2863,7 +2778,7 @@ Figure&nbsp;3: Hourly day-ahead price correlations across European bidding zones
 </div>
 </section>
 <section id="sec-geo-map" class="level2" data-number="4.2">
-<h2 data-number="4.2" class="anchored" data-anchor-id="sec-geo-map"><span class="header-section-number">4.2</span> 4.2 Geographic View — Price Linkages Across Europe</h2>
+<h2 data-number="4.2" class="anchored" data-anchor-id="sec-geo-map"><span class="header-section-number">4.2</span> Geographic View — Price Linkages Across Europe</h2>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3034,7 +2949,7 @@ Figure&nbsp;3: Hourly day-ahead price correlations across European bidding zones
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-zone-correlation-map-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 <div id="htmlwidget-957ec931f9e0d35b1aa1" style="width:100%;height:505px;" class="plotly html-widget"></div>
-<script type="application/json" data-for="htmlwidget-957ec931f9e0d35b1aa1">{"x":{"visdat":{"53685015f47":["function () ","plotlyVisDat"],"53683bf4371a":["function () ","data"]},"cur_data":"53683bf4371a","attrs":{"53685015f47":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"choropleth","locations":["AUT","BEL","DNK","FIN","FRA","NLD","NOR","SWE","DEU"],"z":[0.95601581218762632,0.9602565667018913,0.95288731612734245,0.64073000961841942,0.89214822838997698,0.9676020740869048,0.61327384047056388,0.56284929590847299,1],"colorscale":[["0","rgb(222,235,247)"],["0.25","rgb(247,247,247)"],["0.5","rgb(253,208,162)"],["0.75","rgb(227,120,71)"],["1","rgb(178,24,43)"]],"zmin":0.14999999999999999,"zmax":1,"marker":{"line":{"color":"rgb(180,180,180)","width":1}},"colorbar":{"title":"Correlation","len":0.40000000000000002,"y":0.5},"hoverinfo":"none","showlegend":false,"inherit":true},"53685015f47.1":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,2.5],"lat":[51,46.5],"line":{"width":3.5685929135599079,"color":"rgb(198,61,61)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,46.5],"y":[10,2.5]},"53685015f47.2":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,5.5],"lat":[51,52],"line":{"width":3.8704082963476192,"color":"rgb(184,35,48)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,52],"y":[10,5.5]},"53685015f47.3":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,4.5],"lat":[51,50.799999999999997],"line":{"width":3.8410262668075652,"color":"rgb(185,38,50)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,50.799999999999997],"y":[10,4.5]},"53685015f47.4":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,14],"lat":[51,47.5],"line":{"width":3.8240632487505053,"color":"rgb(186,39,50)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,47.5],"y":[10,14]},"53685015f47.5":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,9.5],"lat":[51,56],"line":{"width":3.8680623620118078,"color":"rgb(184,35,48)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,56],"y":[10,9.5]},"53685015f47.6":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,12],"lat":[51,55.5],"line":{"width":3.7550361670069319,"color":"rgb(189,45,53)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,55.5],"y":[10,12]},"53685015f47.7":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,60],"line":{"width":3.3804848266727041,"color":"rgb(206,77,69)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,60],"y":[10,10.5]},"53685015f47.8":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,6],"lat":[51,59],"line":{"width":3.5920865869194993,"color":"rgb(197,59,60)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,59],"y":[10,6]},"53685015f47.9":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,63.5],"line":{"width":1.1758559756407176,"color":"rgb(252,222,205)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,63.5],"y":[10,10.5]},"53685015f47.10":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,15.5],"lat":[51,68],"line":{"width":0.79194341358826748,"color":"rgb(251,230,218)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,68],"y":[10,15.5]},"53685015f47.11":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,6.5],"lat":[51,60.5],"line":{"width":3.3251060065900888,"color":"rgb(209,82,71)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,60.5],"y":[10,6.5]},"53685015f47.12":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,18],"lat":[51,66],"line":{"width":1.445550814293675,"color":"rgb(252,212,190)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,66],"y":[10,18]},"53685015f47.13":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,63],"line":{"width":1.5266158970078472,"color":"rgb(251,207,184)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,63],"y":[10,16]},"53685015f47.14":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,59],"line":{"width":2.9001948985287465,"color":"rgb(228,118,88)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,59],"y":[10,16]},"53685015f47.15":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,14.5],"lat":[51,56.5],"line":{"width":3.1332271247053001,"color":"rgb(218,98,79)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,56.5],"y":[10,14.5]},"53685015f47.16":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,26],"lat":[51,62],"line":{"width":2.5629200384736777,"color":"rgb(240,144,106)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,62],"y":[10,26]},"53683bf4371a":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"markers+text","lon":{},"lat":{},"marker":{"size":{},"color":{},"line":{"width":1.5,"color":"white"}},"text":{},"textposition":"top center","textfont":{"size":10,"color":"rgb(50,50,50)"},"hovertext":{},"hoverinfo":"text","showlegend":false,"inherit":true,"x":{},"y":{}},"53683bf4371a.1":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"markers+text","lon":10,"lat":51,"marker":{"size":16,"color":"#B2182B","symbol":"diamond","line":{"width":2,"color":"white"}},"text":"DE-LU","textposition":"top center","textfont":{"size":12,"color":"black","family":"Arial"},"hovertext":"<b>DE-LU<\/b><br>Reference zone","hoverinfo":"text","showlegend":false,"inherit":true,"x":51,"y":10}},"layout":{"width":900,"height":700,"margin":{"b":20,"l":60,"t":60,"r":10},"mapType":"geo","title":{"text":"How Correlated Are European Electricity Prices with Germany?","font":{"size":16}},"geo":{"domain":{"x":[0,1],"y":[0,1]},"scope":"europe","projection":{"type":"mercator"},"lonaxis":{"range":[-5,30]},"lataxis":{"range":[44,72]},"showland":true,"landcolor":"rgb(235,235,235)","showocean":true,"oceancolor":"rgb(225,235,245)","showcountries":true,"countrycolor":"rgb(180,180,180)","showlakes":true,"lakecolor":"rgb(225,235,245)","showcoastlines":true,"coastlinecolor":"rgb(180,180,180)","resolution":50},"showlegend":false,"scene":{"zaxis":{"title":[]}},"hovermode":"closest"},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"colorbar":{"title":"Correlation","ticklen":2,"len":0.40000000000000002,"y":0.5},"colorscale":[["0","rgb(222,235,247)"],["0.25","rgb(247,247,247)"],["0.5","rgb(253,208,162)"],["0.75","rgb(227,120,71)"],["1","rgb(178,24,43)"]],"showscale":true,"type":"choropleth","locations":["AUT","BEL","DNK","FIN","FRA","NLD","NOR","SWE","DEU"],"z":[0.95601581218762632,0.9602565667018913,0.95288731612734245,0.64073000961841942,0.89214822838997698,0.9676020740869048,0.61327384047056388,0.56284929590847299,1],"zmin":0.14999999999999999,"zmax":1,"marker":{"line":{"color":"rgb(180,180,180)","width":1}},"hoverinfo":["none","none","none","none","none","none","none","none","none"],"showlegend":false,"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,2.5],"lat":[51,46.5],"line":{"color":"rgb(198,61,61)","width":3.5685929135599079},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(255,127,14,1)","line":{"color":"rgba(255,127,14,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,5.5],"lat":[51,52],"line":{"color":"rgb(184,35,48)","width":3.8704082963476192},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(44,160,44,1)","line":{"color":"rgba(44,160,44,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,4.5],"lat":[51,50.799999999999997],"line":{"color":"rgb(185,38,50)","width":3.8410262668075652},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(214,39,40,1)","line":{"color":"rgba(214,39,40,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,14],"lat":[51,47.5],"line":{"color":"rgb(186,39,50)","width":3.8240632487505053},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(148,103,189,1)","line":{"color":"rgba(148,103,189,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,9.5],"lat":[51,56],"line":{"color":"rgb(184,35,48)","width":3.8680623620118078},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(140,86,75,1)","line":{"color":"rgba(140,86,75,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,12],"lat":[51,55.5],"line":{"color":"rgb(189,45,53)","width":3.7550361670069319},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(227,119,194,1)","line":{"color":"rgba(227,119,194,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,60],"line":{"color":"rgb(206,77,69)","width":3.3804848266727041},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(127,127,127,1)","line":{"color":"rgba(127,127,127,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,6],"lat":[51,59],"line":{"color":"rgb(197,59,60)","width":3.5920865869194993},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(188,189,34,1)","line":{"color":"rgba(188,189,34,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,63.5],"line":{"color":"rgb(252,222,205)","width":1.1758559756407176},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(23,190,207,1)","line":{"color":"rgba(23,190,207,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,15.5],"lat":[51,68],"line":{"color":"rgb(251,230,218)","width":0.79194341358826748},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,6.5],"lat":[51,60.5],"line":{"color":"rgb(209,82,71)","width":3.3251060065900888},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(255,127,14,1)","line":{"color":"rgba(255,127,14,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,18],"lat":[51,66],"line":{"color":"rgb(252,212,190)","width":1.445550814293675},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(44,160,44,1)","line":{"color":"rgba(44,160,44,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,63],"line":{"color":"rgb(251,207,184)","width":1.5266158970078472},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(214,39,40,1)","line":{"color":"rgba(214,39,40,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,59],"line":{"color":"rgb(228,118,88)","width":2.9001948985287465},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(148,103,189,1)","line":{"color":"rgba(148,103,189,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,14.5],"lat":[51,56.5],"line":{"color":"rgb(218,98,79)","width":3.1332271247053001},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(140,86,75,1)","line":{"color":"rgba(140,86,75,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,26],"lat":[51,62],"line":{"color":"rgb(240,144,106)","width":2.5629200384736777},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(227,119,194,1)","line":{"color":"rgba(227,119,194,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"markers+text","lon":[2.5,5.5,4.5,14,9.5,12,10.5,6,10.5,15.5,6.5,18,16,16,14.5,26],"lat":[46.5,52,50.799999999999997,47.5,56,55.5,60,59,63.5,68,60.5,66,63,59,56.5,62],"marker":{"color":["rgb(198,61,61)","rgb(184,35,48)","rgb(185,38,50)","rgb(186,39,50)","rgb(184,35,48)","rgb(189,45,53)","rgb(206,77,69)","rgb(197,59,60)","rgb(252,222,205)","rgb(251,230,218)","rgb(209,82,71)","rgb(252,212,190)","rgb(251,207,184)","rgb(228,118,88)","rgb(218,98,79)","rgb(240,144,106)"],"size":[27.303705709749426,29.190051852172619,29.006414167547284,28.900395304690658,29.175389762573797,28.468976043793326,26.128030166704402,27.450541168246872,12.349099847754484,9.9496463349266726,25.781912541188056,14.034692589335469,14.541349356299044,23.126218115804665,24.582669529408125,21.018250240460485],"line":{"color":"white","width":1.5}},"text":["FR (0.89)","NL (0.97)","BE (0.96)","AT (0.96)","DK1 (0.97)","DK2 (0.94)","NO1 (0.85)","NO2 (0.90)","NO3 (0.29)","NO4 (0.20)","NO5 (0.83)","SE1 (0.36)","SE2 (0.38)","SE3 (0.73)","SE4 (0.78)","FI (0.64)"],"textposition":["top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center"],"textfont":{"size":10,"color":"rgb(50,50,50)"},"hovertext":["<b>FR<\/b><br>Correlation with DE-LU: <b>0.89<\/b>","<b>NL<\/b><br>Correlation with DE-LU: <b>0.97<\/b>","<b>BE<\/b><br>Correlation with DE-LU: <b>0.96<\/b>","<b>AT<\/b><br>Correlation with DE-LU: <b>0.96<\/b>","<b>DK1<\/b><br>Correlation with DE-LU: <b>0.97<\/b>","<b>DK2<\/b><br>Correlation with DE-LU: <b>0.94<\/b>","<b>NO1<\/b><br>Correlation with DE-LU: <b>0.85<\/b>","<b>NO2<\/b><br>Correlation with DE-LU: <b>0.90<\/b>","<b>NO3<\/b><br>Correlation with DE-LU: <b>0.29<\/b>","<b>NO4<\/b><br>Correlation with DE-LU: <b>0.20<\/b>","<b>NO5<\/b><br>Correlation with DE-LU: <b>0.83<\/b>","<b>SE1<\/b><br>Correlation with DE-LU: <b>0.36<\/b>","<b>SE2<\/b><br>Correlation with DE-LU: <b>0.38<\/b>","<b>SE3<\/b><br>Correlation with DE-LU: <b>0.73<\/b>","<b>SE4<\/b><br>Correlation with DE-LU: <b>0.78<\/b>","<b>FI<\/b><br>Correlation with DE-LU: <b>0.64<\/b>"],"hoverinfo":["text","text","text","text","text","text","text","text","text","text","text","text","text","text","text","text"],"showlegend":false,"line":{"color":"rgba(127,127,127,1)"},"geo":"geo","frame":null},{"type":"scattergeo","mode":"markers+text","lon":[10],"lat":[51],"marker":{"color":"#B2182B","size":16,"symbol":"diamond","line":{"color":"white","width":2}},"text":"DE-LU","textposition":"top center","textfont":{"size":12,"color":"black","family":"Arial"},"hovertext":"<b>DE-LU<\/b><br>Reference zone","hoverinfo":"text","showlegend":false,"line":{"color":"rgba(188,189,34,1)"},"geo":"geo","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.20000000000000001,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
+<script type="application/json" data-for="htmlwidget-957ec931f9e0d35b1aa1">{"x":{"visdat":{"518052e96642":["function () ","plotlyVisDat"],"518034974568":["function () ","data"]},"cur_data":"518034974568","attrs":{"518052e96642":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"choropleth","locations":["AUT","BEL","DNK","FIN","FRA","NLD","NOR","SWE","DEU"],"z":[0.95601581218762632,0.9602565667018913,0.95288731612734245,0.64073000961841942,0.89214822838997698,0.9676020740869048,0.61327384047056388,0.56284929590847299,1],"colorscale":[["0","rgb(222,235,247)"],["0.25","rgb(247,247,247)"],["0.5","rgb(253,208,162)"],["0.75","rgb(227,120,71)"],["1","rgb(178,24,43)"]],"zmin":0.14999999999999999,"zmax":1,"marker":{"line":{"color":"rgb(180,180,180)","width":1}},"colorbar":{"title":"Correlation","len":0.40000000000000002,"y":0.5},"hoverinfo":"none","showlegend":false,"inherit":true},"518052e96642.1":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,2.5],"lat":[51,46.5],"line":{"width":3.5685929135599079,"color":"rgb(198,61,61)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,46.5],"y":[10,2.5]},"518052e96642.2":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,5.5],"lat":[51,52],"line":{"width":3.8704082963476192,"color":"rgb(184,35,48)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,52],"y":[10,5.5]},"518052e96642.3":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,4.5],"lat":[51,50.799999999999997],"line":{"width":3.8410262668075652,"color":"rgb(185,38,50)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,50.799999999999997],"y":[10,4.5]},"518052e96642.4":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,14],"lat":[51,47.5],"line":{"width":3.8240632487505053,"color":"rgb(186,39,50)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,47.5],"y":[10,14]},"518052e96642.5":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,9.5],"lat":[51,56],"line":{"width":3.8680623620118078,"color":"rgb(184,35,48)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,56],"y":[10,9.5]},"518052e96642.6":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,12],"lat":[51,55.5],"line":{"width":3.7550361670069319,"color":"rgb(189,45,53)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,55.5],"y":[10,12]},"518052e96642.7":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,60],"line":{"width":3.3804848266727041,"color":"rgb(206,77,69)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,60],"y":[10,10.5]},"518052e96642.8":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,6],"lat":[51,59],"line":{"width":3.5920865869194993,"color":"rgb(197,59,60)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,59],"y":[10,6]},"518052e96642.9":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,63.5],"line":{"width":1.1758559756407176,"color":"rgb(252,222,205)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,63.5],"y":[10,10.5]},"518052e96642.10":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,15.5],"lat":[51,68],"line":{"width":0.79194341358826748,"color":"rgb(251,230,218)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,68],"y":[10,15.5]},"518052e96642.11":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,6.5],"lat":[51,60.5],"line":{"width":3.3251060065900888,"color":"rgb(209,82,71)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,60.5],"y":[10,6.5]},"518052e96642.12":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,18],"lat":[51,66],"line":{"width":1.445550814293675,"color":"rgb(252,212,190)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,66],"y":[10,18]},"518052e96642.13":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,63],"line":{"width":1.5266158970078472,"color":"rgb(251,207,184)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,63],"y":[10,16]},"518052e96642.14":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,59],"line":{"width":2.9001948985287465,"color":"rgb(228,118,88)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,59],"y":[10,16]},"518052e96642.15":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,14.5],"lat":[51,56.5],"line":{"width":3.1332271247053001,"color":"rgb(218,98,79)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,56.5],"y":[10,14.5]},"518052e96642.16":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"lines","lon":[10,26],"lat":[51,62],"line":{"width":2.5629200384736777,"color":"rgb(240,144,106)"},"opacity":0.90000000000000002,"hoverinfo":"none","showlegend":false,"inherit":true,"x":[51,62],"y":[10,26]},"518034974568":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"markers+text","lon":{},"lat":{},"marker":{"size":{},"color":{},"line":{"width":1.5,"color":"white"}},"text":{},"textposition":"top center","textfont":{"size":10,"color":"rgb(50,50,50)"},"hovertext":{},"hoverinfo":"text","showlegend":false,"inherit":true,"x":{},"y":{}},"518034974568.1":{"alpha_stroke":1,"sizes":[10,100],"spans":[1,20],"type":"scattergeo","mode":"markers+text","lon":10,"lat":51,"marker":{"size":16,"color":"#B2182B","symbol":"diamond","line":{"width":2,"color":"white"}},"text":"DE-LU","textposition":"top center","textfont":{"size":12,"color":"black","family":"Arial"},"hovertext":"<b>DE-LU<\/b><br>Reference zone","hoverinfo":"text","showlegend":false,"inherit":true,"x":51,"y":10}},"layout":{"width":900,"height":700,"margin":{"b":20,"l":60,"t":60,"r":10},"mapType":"geo","title":{"text":"How Correlated Are European Electricity Prices with Germany?","font":{"size":16}},"geo":{"domain":{"x":[0,1],"y":[0,1]},"scope":"europe","projection":{"type":"mercator"},"lonaxis":{"range":[-5,30]},"lataxis":{"range":[44,72]},"showland":true,"landcolor":"rgb(235,235,235)","showocean":true,"oceancolor":"rgb(225,235,245)","showcountries":true,"countrycolor":"rgb(180,180,180)","showlakes":true,"lakecolor":"rgb(225,235,245)","showcoastlines":true,"coastlinecolor":"rgb(180,180,180)","resolution":50},"showlegend":false,"scene":{"zaxis":{"title":[]}},"hovermode":"closest"},"source":"A","config":{"modeBarButtonsToAdd":["hoverclosest","hovercompare"],"showSendToCloud":false},"data":[{"colorbar":{"title":"Correlation","ticklen":2,"len":0.40000000000000002,"y":0.5},"colorscale":[["0","rgb(222,235,247)"],["0.25","rgb(247,247,247)"],["0.5","rgb(253,208,162)"],["0.75","rgb(227,120,71)"],["1","rgb(178,24,43)"]],"showscale":true,"type":"choropleth","locations":["AUT","BEL","DNK","FIN","FRA","NLD","NOR","SWE","DEU"],"z":[0.95601581218762632,0.9602565667018913,0.95288731612734245,0.64073000961841942,0.89214822838997698,0.9676020740869048,0.61327384047056388,0.56284929590847299,1],"zmin":0.14999999999999999,"zmax":1,"marker":{"line":{"color":"rgb(180,180,180)","width":1}},"hoverinfo":["none","none","none","none","none","none","none","none","none"],"showlegend":false,"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,2.5],"lat":[51,46.5],"line":{"color":"rgb(198,61,61)","width":3.5685929135599079},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(255,127,14,1)","line":{"color":"rgba(255,127,14,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,5.5],"lat":[51,52],"line":{"color":"rgb(184,35,48)","width":3.8704082963476192},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(44,160,44,1)","line":{"color":"rgba(44,160,44,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,4.5],"lat":[51,50.799999999999997],"line":{"color":"rgb(185,38,50)","width":3.8410262668075652},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(214,39,40,1)","line":{"color":"rgba(214,39,40,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,14],"lat":[51,47.5],"line":{"color":"rgb(186,39,50)","width":3.8240632487505053},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(148,103,189,1)","line":{"color":"rgba(148,103,189,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,9.5],"lat":[51,56],"line":{"color":"rgb(184,35,48)","width":3.8680623620118078},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(140,86,75,1)","line":{"color":"rgba(140,86,75,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,12],"lat":[51,55.5],"line":{"color":"rgb(189,45,53)","width":3.7550361670069319},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(227,119,194,1)","line":{"color":"rgba(227,119,194,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,60],"line":{"color":"rgb(206,77,69)","width":3.3804848266727041},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(127,127,127,1)","line":{"color":"rgba(127,127,127,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,6],"lat":[51,59],"line":{"color":"rgb(197,59,60)","width":3.5920865869194993},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(188,189,34,1)","line":{"color":"rgba(188,189,34,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,10.5],"lat":[51,63.5],"line":{"color":"rgb(252,222,205)","width":1.1758559756407176},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(23,190,207,1)","line":{"color":"rgba(23,190,207,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,15.5],"lat":[51,68],"line":{"color":"rgb(251,230,218)","width":0.79194341358826748},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(31,119,180,1)","line":{"color":"rgba(31,119,180,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,6.5],"lat":[51,60.5],"line":{"color":"rgb(209,82,71)","width":3.3251060065900888},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(255,127,14,1)","line":{"color":"rgba(255,127,14,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,18],"lat":[51,66],"line":{"color":"rgb(252,212,190)","width":1.445550814293675},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(44,160,44,1)","line":{"color":"rgba(44,160,44,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,63],"line":{"color":"rgb(251,207,184)","width":1.5266158970078472},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(214,39,40,1)","line":{"color":"rgba(214,39,40,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,16],"lat":[51,59],"line":{"color":"rgb(228,118,88)","width":2.9001948985287465},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(148,103,189,1)","line":{"color":"rgba(148,103,189,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,14.5],"lat":[51,56.5],"line":{"color":"rgb(218,98,79)","width":3.1332271247053001},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(140,86,75,1)","line":{"color":"rgba(140,86,75,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"lines","lon":[10,26],"lat":[51,62],"line":{"color":"rgb(240,144,106)","width":2.5629200384736777},"opacity":0.90000000000000002,"hoverinfo":["none","none"],"showlegend":false,"marker":{"color":"rgba(227,119,194,1)","line":{"color":"rgba(227,119,194,1)"}},"geo":"geo","frame":null},{"type":"scattergeo","mode":"markers+text","lon":[2.5,5.5,4.5,14,9.5,12,10.5,6,10.5,15.5,6.5,18,16,16,14.5,26],"lat":[46.5,52,50.799999999999997,47.5,56,55.5,60,59,63.5,68,60.5,66,63,59,56.5,62],"marker":{"color":["rgb(198,61,61)","rgb(184,35,48)","rgb(185,38,50)","rgb(186,39,50)","rgb(184,35,48)","rgb(189,45,53)","rgb(206,77,69)","rgb(197,59,60)","rgb(252,222,205)","rgb(251,230,218)","rgb(209,82,71)","rgb(252,212,190)","rgb(251,207,184)","rgb(228,118,88)","rgb(218,98,79)","rgb(240,144,106)"],"size":[27.303705709749426,29.190051852172619,29.006414167547284,28.900395304690658,29.175389762573797,28.468976043793326,26.128030166704402,27.450541168246872,12.349099847754484,9.9496463349266726,25.781912541188056,14.034692589335469,14.541349356299044,23.126218115804665,24.582669529408125,21.018250240460485],"line":{"color":"white","width":1.5}},"text":["FR (0.89)","NL (0.97)","BE (0.96)","AT (0.96)","DK1 (0.97)","DK2 (0.94)","NO1 (0.85)","NO2 (0.90)","NO3 (0.29)","NO4 (0.20)","NO5 (0.83)","SE1 (0.36)","SE2 (0.38)","SE3 (0.73)","SE4 (0.78)","FI (0.64)"],"textposition":["top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center","top center"],"textfont":{"size":10,"color":"rgb(50,50,50)"},"hovertext":["<b>FR<\/b><br>Correlation with DE-LU: <b>0.89<\/b>","<b>NL<\/b><br>Correlation with DE-LU: <b>0.97<\/b>","<b>BE<\/b><br>Correlation with DE-LU: <b>0.96<\/b>","<b>AT<\/b><br>Correlation with DE-LU: <b>0.96<\/b>","<b>DK1<\/b><br>Correlation with DE-LU: <b>0.97<\/b>","<b>DK2<\/b><br>Correlation with DE-LU: <b>0.94<\/b>","<b>NO1<\/b><br>Correlation with DE-LU: <b>0.85<\/b>","<b>NO2<\/b><br>Correlation with DE-LU: <b>0.90<\/b>","<b>NO3<\/b><br>Correlation with DE-LU: <b>0.29<\/b>","<b>NO4<\/b><br>Correlation with DE-LU: <b>0.20<\/b>","<b>NO5<\/b><br>Correlation with DE-LU: <b>0.83<\/b>","<b>SE1<\/b><br>Correlation with DE-LU: <b>0.36<\/b>","<b>SE2<\/b><br>Correlation with DE-LU: <b>0.38<\/b>","<b>SE3<\/b><br>Correlation with DE-LU: <b>0.73<\/b>","<b>SE4<\/b><br>Correlation with DE-LU: <b>0.78<\/b>","<b>FI<\/b><br>Correlation with DE-LU: <b>0.64<\/b>"],"hoverinfo":["text","text","text","text","text","text","text","text","text","text","text","text","text","text","text","text"],"showlegend":false,"line":{"color":"rgba(127,127,127,1)"},"geo":"geo","frame":null},{"type":"scattergeo","mode":"markers+text","lon":[10],"lat":[51],"marker":{"color":"#B2182B","size":16,"symbol":"diamond","line":{"color":"white","width":2}},"text":"DE-LU","textposition":"top center","textfont":{"size":12,"color":"black","family":"Arial"},"hovertext":"<b>DE-LU<\/b><br>Reference zone","hoverinfo":"text","showlegend":false,"line":{"color":"rgba(188,189,34,1)"},"geo":"geo","frame":null}],"highlight":{"on":"plotly_click","persistent":false,"dynamic":false,"selectize":false,"opacityDim":0.20000000000000001,"selected":{"opacity":1},"debounce":0},"shinyEvents":["plotly_hover","plotly_click","plotly_selected","plotly_relayout","plotly_brushed","plotly_brushing","plotly_clickannotation","plotly_doubleclick","plotly_deselect","plotly_afterplot","plotly_sunburstclick"],"base_url":"https://plot.ly"},"evals":[],"jsHooks":[]}</script>
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-zone-correlation-map-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
 Figure&nbsp;4: Price correlation with DE-LU across European bidding zones — hover for details
@@ -3057,7 +2972,7 @@ Figure&nbsp;4: Price correlation with DE-LU across European bidding zones — ho
 </div>
 </section>
 <section id="sec-seasonal-corr" class="level2" data-number="4.3">
-<h2 data-number="4.3" class="anchored" data-anchor-id="sec-seasonal-corr"><span class="header-section-number">4.3</span> 4.3 Seasonal Price Correlation</h2>
+<h2 data-number="4.3" class="anchored" data-anchor-id="sec-seasonal-corr"><span class="header-section-number">4.3</span> Seasonal Price Correlation</h2>
 <p>Price linkages aren’t fixed — they shift with season as weather patterns and demand fundamentals change.</p>
 <div class="cell">
 <details class="code-fold">
@@ -3109,10 +3024,10 @@ Figure&nbsp;5: DE-LU price correlation with neighbouring zones varies by season
 </section>
 </section>
 <section id="sec-comparison" class="level1" data-number="5">
-<h1 data-number="5"><span class="header-section-number">5</span> 5.0 DK_1 Comparison</h1>
+<h1 data-number="5"><span class="header-section-number">5</span> DK_1 Comparison</h1>
 <p>DK_1 serves as a natural comparison to DE-LU. By fitting the same regression structure to a zone with a different generation mix, we can see how market composition shapes the seasonal risk profile.</p>
 <section id="sec-comp-features" class="level2" data-number="5.1">
-<h2 data-number="5.1" class="anchored" data-anchor-id="sec-comp-features"><span class="header-section-number">5.1</span> 5.1 Feature Engineering</h2>
+<h2 data-number="5.1" class="anchored" data-anchor-id="sec-comp-features"><span class="header-section-number">5.1</span> Feature Engineering</h2>
 <div class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
@@ -3205,7 +3120,7 @@ Figure&nbsp;5: DE-LU price correlation with neighbouring zones varies by season
 </div>
 </section>
 <section id="sec-comp-regression" class="level2" data-number="5.2">
-<h2 data-number="5.2" class="anchored" data-anchor-id="sec-comp-regression"><span class="header-section-number">5.2</span> 5.2 Seasonal Variance Attribution</h2>
+<h2 data-number="5.2" class="anchored" data-anchor-id="sec-comp-regression"><span class="header-section-number">5.2</span> Seasonal Variance Attribution</h2>
 <p>We fit the same model structure as Stage 2 — OLS with the same feature groups — within each season. Partial R² measures how much price variance each feature group explains: drop the feature, see how much R² falls.</p>
 <div class="cell">
 <details class="code-fold">
@@ -3862,9 +3777,9 @@ Figure&nbsp;6: Seasonal variance attribution — which factors drive prices in e
 </section>
 </section>
 <section id="sec-hedging" class="level1" data-number="6">
-<h1 data-number="6"><span class="header-section-number">6</span> 6.0 Hedging Implications</h1>
+<h1 data-number="6"><span class="header-section-number">6</span> Hedging Implications</h1>
 <section id="what-the-risk-structure-means-for-hedging" class="level2" data-number="6.1">
-<h2 data-number="6.1" class="anchored" data-anchor-id="what-the-risk-structure-means-for-hedging"><span class="header-section-number">6.1</span> 6.1 What the Risk Structure Means for Hedging</h2>
+<h2 data-number="6.1" class="anchored" data-anchor-id="what-the-risk-structure-means-for-hedging"><span class="header-section-number">6.1</span> What the Risk Structure Means for Hedging</h2>
 <p>The analysis above reveals a clear seasonal pattern in what drives revenue risk for a wind portfolio:</p>
 <div class="cell">
 <details class="code-fold">
@@ -4410,7 +4325,7 @@ Figure&nbsp;6: Seasonal variance attribution — which factors drive prices in e
 </div>
 </section>
 <section id="sec-fca" class="level2" data-number="6.2">
-<h2 data-number="6.2" class="anchored" data-anchor-id="sec-fca"><span class="header-section-number">6.2</span> 6.2 Cross-Border Capacity as a Risk Tool</h2>
+<h2 data-number="6.2" class="anchored" data-anchor-id="sec-fca"><span class="header-section-number">6.2</span> Cross-Border Capacity as a Risk Tool</h2>
 <p>The ENTSO-E <a href="https://www.entsoe.eu/network_codes/fca/">Forward Capacity Allocation (FCA) regulation</a> governs how cross-border transmission rights are allocated — the framework that determines whether generators can actually access neighbouring markets for hedging purposes.</p>
 <p>Our cross-zone analysis shows why this matters:</p>
 <ul>
@@ -4434,9 +4349,9 @@ Figure&nbsp;6: Seasonal variance attribution — which factors drive prices in e
 </section>
 </section>
 <section id="sec-appendix" class="level1" data-number="7">
-<h1 data-number="7"><span class="header-section-number">7</span> 7.0 Technical Notes</h1>
+<h1 data-number="7"><span class="header-section-number">7</span> Technical Notes</h1>
 <section id="sec-convergence" class="level2" data-number="7.1">
-<h2 data-number="7.1" class="anchored" data-anchor-id="sec-convergence"><span class="header-section-number">7.1</span> 7.1 Simulation Convergence</h2>
+<h2 data-number="7.1" class="anchored" data-anchor-id="sec-convergence"><span class="header-section-number">7.1</span> Simulation Convergence</h2>
 <p>Are 10,000 simulations enough for stable risk estimates? The plot below shows how CVaR 95% stabilises as the number of draws increases.</p>
 <div class="cell">
 <details class="code-fold">
@@ -4488,7 +4403,7 @@ Figure&nbsp;7: CVaR 95% converges well before the full simulation count
 </div>
 </section>
 <section id="assumptions-limitations" class="level2" data-number="7.2">
-<h2 data-number="7.2" class="anchored" data-anchor-id="assumptions-limitations"><span class="header-section-number">7.2</span> 7.2 Assumptions &amp; Limitations</h2>
+<h2 data-number="7.2" class="anchored" data-anchor-id="assumptions-limitations"><span class="header-section-number">7.2</span> Assumptions &amp; Limitations</h2>
 <p>This analysis makes several deliberate simplifications:</p>
 <ul>
 <li><strong>Fully unhedged portfolio.</strong> In practice, most generators hedge 60–90% of expected output via forward contracts or PPAs. The unhedged case represents the maximum spot exposure — the risk baseline against which any hedging strategy is measured.</li>
@@ -4500,19 +4415,18 @@ Figure&nbsp;7: CVaR 95% converges well before the full simulation count
 </ul>
 </section>
 <section id="data-sources" class="level2" data-number="7.3">
-<h2 data-number="7.3" class="anchored" data-anchor-id="data-sources"><span class="header-section-number">7.3</span> 7.3 Data Sources</h2>
+<h2 data-number="7.3" class="anchored" data-anchor-id="data-sources"><span class="header-section-number">7.3</span> Data Sources</h2>
 <ul>
 <li><strong>SMARD (Bundesnetzagentur):</strong> DE-LU generation, load, and day-ahead price. <a href="https://www.smard.de/">SMARD.de</a>, CC BY 4.0.</li>
 <li><strong>ENTSO-E Transparency Platform:</strong> Multi-zone prices, cross-border flows, and generation by type. Used per ENTSO-E terms of service.</li>
 <li><strong>Copernicus ERA5 Reanalysis:</strong> Hourly wind speed and solar irradiance. Hersbach et al.&nbsp;(2020), doi:<a href="https://doi.org/10.24381/cds.adbb2d47">10.24381/cds.adbb2d47</a>.</li>
 <li><strong>Yahoo Finance:</strong> TTF natural gas front-month futures (ICE Dutch TTF, EUR/MWh).</li>
 </ul>
-
-
 </section>
 </section>
 
-</main> <!-- /main -->
+</main>
+<!-- /main column -->
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     const icon = "";
@@ -4914,19 +4828,6 @@ Figure&nbsp;7: CVaR 95% converges well before the full simulation count
   });
   </script>
 </div> <!-- /content -->
-<footer class="footer">
-  <div class="nav-footer">
-    <div class="nav-footer-left">
-      &nbsp;
-    </div>   
-    <div class="nav-footer-center">
-<p>Data: <a href="https://www.smard.de">SMARD (CC BY 4.0)</a> · [ENTSO-E](https://transparency.entso</p>
-</div>
-    <div class="nav-footer-right">
-      &nbsp;
-    </div>
-  </div>
-</footer>
 
 
 

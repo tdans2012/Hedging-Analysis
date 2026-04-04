@@ -26,6 +26,7 @@ data/raw/
 .quarto/
 *_cache/
 *_files/
+!docs/*_files/
 
 # R environment
 .Rproj.user/
