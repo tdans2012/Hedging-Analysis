@@ -170,7 +170,7 @@ ERA5 reanalysis provides hourly solar irradiance and temperature for the DE-LU z
 ```{r}
 #| label: load-era5
 
-era5 <- read_parquet("data/processed/era5/DE_LU.parquet")
+era5 <- read_parquet("data/processed/era5/DE-LU.parquet")
 
 cat(
   "ERA5 rows:", nrow(era5), "\n",
