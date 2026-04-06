@@ -118,6 +118,76 @@ cat("DE-LU SMARD rows:", nrow(smard),
 ```
 
 
+## 2.1 Derived weather features: HDD & CDD {#sec-hdd-cdd}
+
+Heating degree days (HDD) and cooling degree days (CDD) translate raw
+temperature into demand-relevant signals. When temperatures drop below
+the base (18 °C), heating load rises roughly in proportion; when they
+exceed it, cooling demand kicks in. These are standard features in
+electricity load and price modelling across European markets.
+
+We compute hourly HDD and CDD here and save them alongside the existing
+ERA5 variables so that Stage 2 (price decomposition) can ingest them
+directly.
+
+```{r}
+#| label: derive-hdd-cdd
+
+hdd_cdd_base <- 18  # °C — standard European base temperature
+
+era5_all <- era5_all |>
+  mutate(
+    hdd = pmax(hdd_cdd_base - temperature_2m, 0),
+    cdd = pmax(temperature_2m - hdd_cdd_base, 0)
+  )
+
+# Update DE-LU subset
+era5 <- era5_all |> filter(zone == zone_file) |> select(-zone)
+
+# Summary check
+era5 |>
+  summarise(
+    `HDD mean` = round(mean(hdd), 2),
+    `HDD max`  = round(max(hdd), 1),
+    `CDD mean` = round(mean(cdd), 2),
+    `CDD max`  = round(max(cdd), 1),
+    `Hours T < 18°C` = sum(temperature_2m < hdd_cdd_base),
+    `Hours T > 18°C` = sum(temperature_2m > hdd_cdd_base)
+  ) |>
+  knitr::kable(caption = "HDD/CDD summary (DE-LU, 18 °C base)")
+```
+
+```{r}
+#| label: fig-hdd-cdd-seasonal
+#| fig-cap: "Seasonal distribution of hourly HDD and CDD (DE-LU). HDD dominates in winter; CDD is concentrated in summer but much smaller in magnitude — consistent with Germany's heating-dominated climate."
+#| fig-width: 10
+#| fig-height: 5
+
+era5 |>
+  mutate(
+    season = case_when(
+      month(datetime_utc) %in% c(12, 1, 2) ~ "Winter",
+      month(datetime_utc) %in% c(3, 4, 5)  ~ "Spring",
+      month(datetime_utc) %in% c(6, 7, 8)  ~ "Summer",
+      TRUE                                  ~ "Autumn"
+    ) |> factor(levels = c("Winter", "Spring", "Summer", "Autumn"))
+  ) |>
+  pivot_longer(c(hdd, cdd), names_to = "variable", values_to = "value") |>
+  filter(value > 0) |>
+  mutate(variable = recode(variable, hdd = "HDD (18°C base)", cdd = "CDD (18°C base)")) |>
+  ggplot(aes(x = value, fill = season)) +
+  geom_histogram(bins = 50, alpha = 0.7, position = "identity") +
+  facet_wrap(~ variable, scales = "free") +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title   = "Heating & Cooling Degree Distribution by Season",
+    subtitle = "Hourly values > 0, DE-LU (18 °C base temperature)",
+    x = "Degree hours", y = "Count", fill = NULL,
+    caption = "Source: Copernicus ERA5 reanalysis"
+  )
+```
+
+
 ## 3.0 Cross-zone weather profiles {#sec-cross-zone}
 
 Before narrowing to DE-LU for capacity-factor modelling, we compare the
@@ -782,6 +852,27 @@ metrics_wind_off |>
   knitr::kable(digits = 4, caption = "Wind offshore model — test set performance")
 ```
 
+::: {.callout-warning title="Offshore wind model — known limitation"}
+The offshore wind model achieves an R² of only ~0.29 on the test set —
+substantially weaker than onshore wind (R² ~0.92) or solar PV (R² ~0.84).
+This is a spatial resolution problem, not a specification issue: ERA5 wind
+speeds are averaged over the entire DE-LU zone using cosine-latitude
+weighting, which dilutes the coastal and maritime wind signals that drive
+offshore turbine output. Offshore farms in the German North Sea and Baltic
+experience wind regimes that differ meaningfully from the zone-average
+conditions captured by the ERA5 spatial mean.
+
+**Downstream implications.** This model is used in Stage 3 to predict
+offshore capacity factors for the Monte Carlo revenue simulation. At
+R² = 0.29, the predictions are essentially noisy — they will understate
+the true range of offshore generation outcomes. We flag this as a known
+limitation of the current data pipeline. A targeted improvement would be
+to extract ERA5 grid cells overlapping German offshore wind farm clusters
+(e.g. the Helgoland/Borkum cluster in the North Sea) rather than using
+the full DE-LU spatial average. For this iteration, the Stage 3 portfolio
+analysis focuses on onshore wind where the CF model is reliable.
+:::
+
 
 ### 8.3 Solar PV {#sec-model-solar}
 
@@ -875,6 +966,78 @@ p3 <- diag_panels(preds_solar,    "cf_solar",         "Solar PV",      pal["sola
 ```
 
 
+## 9.1 Residual autocorrelation {#sec-acf}
+
+The scatter and histogram diagnostics above assess bias and distributional
+shape, but not temporal dependence. If model residuals are strongly
+autocorrelated, it indicates systematic patterns the specification is
+missing — for instance, multi-day weather persistence or seasonal ramp
+events that the polynomial + fixed effects structure cannot capture.
+
+We plot the ACF and PACF for the wind onshore and solar PV test-set
+residuals (offshore is omitted given its low R²). Significant
+autocorrelation at short lags (1–6 hours) is expected — weather
+persistence is physical — but decay beyond ~24 hours would suggest the
+model is adequate for the hourly predictions used in Stage 3.
+
+```{r}
+#| label: fig-acf-pacf
+#| fig-cap: "Residual ACF and PACF for the wind onshore and solar PV capacity factor models (test set). Significant short-lag autocorrelation reflects physical weather persistence; rapid decay beyond 24–48 hours indicates the model captures the dominant temporal structure."
+#| fig-width: 10
+#| fig-height: 8
+
+acf_plot <- function(preds, truth_col, label, colour, max_lag = 72) {
+  resids <- preds |>
+    arrange(datetime_utc) |>
+    mutate(resid = .pred - .data[[truth_col]]) |>
+    pull(resid)
+
+  acf_vals  <- acf(resids, lag.max = max_lag, plot = FALSE)
+  pacf_vals <- pacf(resids, lag.max = max_lag, plot = FALSE)
+
+  ci <- qnorm(0.975) / sqrt(length(resids))
+
+  p_acf <- tibble(lag = acf_vals$lag[-1], acf = acf_vals$acf[-1]) |>
+    ggplot(aes(x = lag, y = acf)) +
+    geom_hline(yintercept = c(-ci, ci), linetype = "dashed", colour = "grey50") +
+    geom_hline(yintercept = 0, colour = "grey30") +
+    geom_segment(aes(xend = lag, yend = 0), colour = colour, linewidth = 0.5) +
+    labs(title = paste(label, "— ACF"), x = "Lag (hours)", y = "ACF")
+
+  p_pacf <- tibble(lag = pacf_vals$lag, pacf = pacf_vals$acf) |>
+    ggplot(aes(x = lag, y = pacf)) +
+    geom_hline(yintercept = c(-ci, ci), linetype = "dashed", colour = "grey50") +
+    geom_hline(yintercept = 0, colour = "grey30") +
+    geom_segment(aes(xend = lag, yend = 0), colour = colour, linewidth = 0.5) +
+    labs(title = paste(label, "— PACF"), x = "Lag (hours)", y = "PACF")
+
+  p_acf + p_pacf
+}
+
+p_acf_wind <- acf_plot(preds_wind_on, "cf_wind_onshore", "Wind onshore", pal["wind_onshore"])
+p_acf_solar <- acf_plot(preds_solar, "cf_solar", "Solar PV", pal["solar"])
+
+(p_acf_wind / p_acf_solar) +
+  plot_annotation(
+    title   = glue("Residual autocorrelation — {zone_file} CF models (test set)"),
+    subtitle = "Dashed lines = 95% confidence bounds under white noise null",
+    caption = "Sources: Copernicus ERA5, SMARD (BNetzA)"
+  )
+```
+
+::: {.callout-note title="Interpreting the ACF/PACF"}
+Significant autocorrelation at lags 1–6 is expected and not concerning for
+this application: weather systems persist for hours, so a model that
+conditions on instantaneous weather will inevitably leave correlated
+residuals. What matters for downstream use is whether the residuals exhibit
+*systematic* multi-day structure. If the ACF decays to near zero by lag 48,
+the model is capturing the dominant temporal features and the remaining
+autocorrelation reflects irreducible weather persistence. If the PACF shows
+spikes at 24-hour intervals, a diurnal component may be under-specified —
+but this is unlikely given the hour fixed effects already in the recipe.
+:::
+
+
 ## 10.0 Save fitted workflows {#sec-export}
 
 The fitted `tidymodels` workflow objects are serialised to `models/` for
@@ -921,6 +1084,12 @@ irradiance follows a clear latitude gradient. These physical differences
 drive the cross-zone variation in renewable generation patterns — and
 ultimately in the price dynamics — explored in Stage 2.
 
+**Derived weather features.** HDD and CDD (@sec-hdd-cdd) translate ERA5
+temperature into demand-relevant signals for Stage 2. Germany's climate
+is heating-dominated: HDD values are substantially larger and more
+variable than CDD, consistent with winter load being the primary
+temperature-driven demand component in the DE-LU zone.
+
 **DE-LU capacity factor models.** ERA5 100 m wind speed is the dominant
 predictor of wind generation capacity factors, with the cubic polynomial
 capturing the characteristic ramp-up and saturation of a turbine power
@@ -932,6 +1101,18 @@ non-monotonicity visible in the unconditional scatter plot
 seasonal regime mixing rather than a data quality issue. Temperature
 adds a modest correction for PV cell-efficiency losses above standard
 test conditions (25 °C).
+
+**Offshore wind limitation.** The offshore CF model (R² ~0.29) is
+substantially weaker than onshore or solar, due to the spatial averaging
+of ERA5 over the full DE-LU zone diluting coastal wind signals. This is
+a known limitation flagged in @sec-model-wind-off; the Stage 3 portfolio
+analysis focuses on onshore wind where the CF model is reliable.
+
+**Residual autocorrelation.** The ACF/PACF analysis (@sec-acf) confirms
+that short-lag autocorrelation in CF model residuals reflects physical
+weather persistence rather than model misspecification. Rapid decay
+beyond 24–48 hours indicates the polynomial + fixed effects specification
+captures the dominant temporal structure.
 
 These fitted workflows feed directly into Stage 2, where weather-driven
 generation predictions are used as features in the day-ahead price

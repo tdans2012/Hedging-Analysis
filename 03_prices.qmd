@@ -26,6 +26,8 @@ library(iml)
 library(car)       # VIF
 library(lmtest)    # Breusch-Pagan test
 library(sandwich)  # HC-robust standard errors
+library(tseries)   # ADF unit root test
+library(timeDate)  # German public holidays
 
 theme_report <- theme_minimal(base_size = 12) +
   theme(
@@ -41,7 +43,7 @@ knitr::opts_chunk$set(fig.width = 10, fig.height = 6, cache.lazy = FALSE)
 
 # 1.0 Introduction {#sec-intro}
 
-This page is the analytical centrepiece of the project. We take hourly generation, load, cross-border flow, and gas price data for the DE-LU bidding zone and decompose day-ahead electricity price variance into its key drivers: renewable penetration, residual demand, interconnector flows, fuel costs, and temporal patterns. The goal is to answer a single question with precision:
+This page is the analytical centrepiece of the project. We take hourly generation, load, cross-border flow, gas price, and weather data for the DE-LU bidding zone and decompose day-ahead electricity price variance into its key drivers: renewable penetration, residual demand, interconnector flows, fuel costs, thermal dispatch, weather conditions, and temporal patterns. The goal is to answer a single question with precision:
 
 > *How much of day-ahead price variance is attributable to renewable generation variability — and how does this change by season?*
 
@@ -111,11 +113,96 @@ if (!file.exists(ttf_path)) {
   cat("TTF loaded from cache:", nrow(ttf_daily), "trading days\n")
 }
 
+# Compute daily TTF change before joining to hourly
+ttf_daily <- ttf_daily |>
+  arrange(date) |>
+  mutate(ttf_change = ttf_eur_mwh - lag(ttf_eur_mwh))
+
 cat(
   "Range:", as.character(min(ttf_daily$date)),
   "to", as.character(max(ttf_daily$date)), "\n",
   "TTF min:", round(min(ttf_daily$ttf_eur_mwh), 1),
   "| max:", round(max(ttf_daily$ttf_eur_mwh), 1), "EUR/MWh"
+)
+```
+
+### 2.3.1 Stationarity Check — ADF Test {#sec-adf}
+
+A unit root in the price series would undermine OLS inference. We apply the Augmented Dickey-Fuller test to the raw hourly price series. Given the strong intra-day and seasonal periodicity in electricity prices, we expect the series to be stationary — confirming that regression on levels (rather than differences) is appropriate.
+
+```{r}
+#| label: adf-test
+
+adf_price <- tseries::adf.test(na.omit(smard$price_de_lu), alternative = "stationary")
+
+cat(
+  "Augmented Dickey-Fuller Test\n",
+  "Statistic:", round(adf_price$statistic, 3), "\n",
+  "p-value:", format.pval(adf_price$p.value, digits = 3), "\n",
+  "Lag order:", adf_price$parameter, "\n\n"
+)
+
+if (adf_price$p.value < 0.05) {
+  cat("Result: null hypothesis of unit root rejected (p < 0.05).\n",
+      "The price series is stationary — regression on levels is appropriate.\n")
+} else {
+  cat("Result: cannot reject unit root. Consider differencing or cointegration analysis.\n")
+}
+
+# Also test TTF
+adf_ttf <- tseries::adf.test(na.omit(ttf_daily$ttf_eur_mwh), alternative = "stationary")
+cat(
+  "\nTTF ADF Test\n",
+  "Statistic:", round(adf_ttf$statistic, 3), "\n",
+  "p-value:", format.pval(adf_ttf$p.value, digits = 3), "\n"
+)
+```
+
+::: {.callout-note title="Interpreting the ADF Results"}
+Electricity spot prices are mean-reverting by construction — the day-ahead auction clears every hour, and demand cycles anchor prices to a daily and seasonal rhythm. The ADF test confirms this: we can safely regress price *levels* on explanatory variables without introducing spurious relationships. The TTF series may show weaker stationarity (the 2022 crisis produced a level shift), but since TTF enters our model as a daily covariate rather than a dependent variable, this is not a concern for the price regression itself.
+:::
+
+
+## 2.4 ERA5 Weather (DE-LU) {#sec-era5}
+
+ERA5 reanalysis provides hourly solar irradiance and temperature for the DE-LU zone. We derive heating degree days (HDD) and cooling degree days (CDD) from the 2-metre temperature — these capture weather-driven electricity demand for heating and cooling, which is distinct from the renewable supply channel captured by renewable share and residual load.
+
+```{r}
+#| label: load-era5
+
+era5 <- read_parquet("data/processed/era5/DE_LU.parquet")
+
+cat(
+  "ERA5 rows:", nrow(era5), "\n",
+  "Range:", as.character(min(era5$datetime_utc)),
+  "to", as.character(max(era5$datetime_utc)), "\n",
+  "Columns:", paste(names(era5), collapse = ", ")
+)
+
+# Check temperature units — ERA5 raw is Kelvin, processed should be Celsius
+temp_range <- range(era5$temperature_2m, na.rm = TRUE)
+cat("Temperature range:", round(temp_range[1], 1), "to", round(temp_range[2], 1), "\n")
+
+# Convert from Kelvin if needed
+if (temp_range[2] > 100) {
+  era5 <- era5 |> mutate(temperature_2m = temperature_2m - 273.15)
+  cat("Converted from Kelvin to Celsius\n")
+}
+
+# Derive HDD and CDD (base 18°C)
+era5 <- era5 |>
+  mutate(
+    hdd = pmax(0, 18 - temperature_2m),
+    cdd = pmax(0, temperature_2m - 18)
+  )
+
+cat(
+  "HDD range:", round(min(era5$hdd, na.rm = TRUE), 1),
+  "to", round(max(era5$hdd, na.rm = TRUE), 1), "\n",
+  "CDD range:", round(min(era5$cdd, na.rm = TRUE), 1),
+  "to", round(max(era5$cdd, na.rm = TRUE), 1), "\n",
+  "SSRD range:", round(min(era5$ssrd_wm2, na.rm = TRUE), 1),
+  "to", round(max(era5$ssrd_wm2, na.rm = TRUE), 1), "W/m²"
 )
 ```
 
@@ -212,14 +299,13 @@ smard |>
       month(datetime_utc) %in% 9:11        ~ "Autumn"
     ) |> factor(levels = c("Winter", "Spring", "Summer", "Autumn"))
   ) |>
-  summarise(avg_price = mean(price_de_lu, na.rm = TRUE),
-            .by = c(hour, dow, season)) |>
+  summarise(avg_price = mean(price_de_lu, na.rm = TRUE), .by = c(season, dow, hour)) |>
   ggplot(aes(hour, dow, fill = avg_price)) +
   geom_tile() +
   facet_wrap(~ season) +
   scale_fill_viridis_c(option = "inferno", name = "EUR/MWh") +
-  scale_x_continuous(breaks = seq(0, 23, 3)) +
-  labs(title = "Average Price Heatmap — Hour x Day-of-Week x Season",
+  labs(title = "Average Hourly Price — DE-LU",
+       subtitle = "By day-of-week, hour, and season (2020-2025)",
        x = "Hour (UTC)", y = NULL)
 ```
 
@@ -230,12 +316,12 @@ smard |>
 #| fig-cap: "Higher gas dispatch is associated with higher prices — gas plants typically set the marginal price."
 
 smard |>
-  ggplot(aes(gas / 1e3, price_de_lu)) +
+  ggplot(aes(gas, price_de_lu)) +
   geom_hex(bins = 80) +
+  geom_smooth(method = "lm", se = FALSE, colour = "#E63946", linewidth = 0.7) +
   scale_fill_viridis_c(option = "mako", trans = "log10", name = "Count") +
   labs(title = "Price vs Gas-Fired Generation",
-       x = "Gas Generation (GW)", y = "EUR/MWh") +
-  coord_cartesian(ylim = c(-50, 400))
+       x = "Gas Generation (MW)", y = "Price (EUR/MWh)")
 ```
 
 ## 3.6 TTF Gas Price
@@ -246,11 +332,10 @@ smard |>
 
 ttf_daily |>
   ggplot(aes(date, ttf_eur_mwh)) +
-  geom_line(colour = "#457B9D", linewidth = 0.5) +
+  geom_line(colour = "#457B9D", linewidth = 0.4) +
   labs(title = "TTF Natural Gas — Front-Month Settlement",
        x = NULL, y = "EUR/MWh")
 ```
-
 
 # 4.0 Feature Engineering {#sec-features}
 
@@ -260,6 +345,38 @@ We construct the variables that enter the price regression. Each captures a dist
 - **Residual load** — total load minus renewable generation. The demand that must be met by dispatchable (mostly thermal) capacity.
 - **Net export balance** — total physical exports minus imports across DE-LU borders. Positive = Germany is a net exporter (tightens domestic supply).
 - **TTF gas price** — the marginal fuel cost for gas-fired generation, which frequently sets the day-ahead clearing price.
+- **TTF daily change** — the day-over-day change in TTF, capturing gas price momentum and traders' response to intra-week fuel cost moves.
+- **Thermal generation** — combined output of biomass, gas, hard coal, and lignite plants. Directly measures dispatchable thermal commitment.
+- **Renewable ramp rate** — hour-over-hour change in renewable share. Rapid ramps force costly thermal redispatch and produce price spikes.
+- **Solar irradiance (SSRD)** — surface solar radiation from ERA5. Captures the weather-driven supply channel independent of installed capacity growth.
+- **Heating/Cooling degree days (HDD/CDD)** — weather-driven demand proxies derived from ERA5 2-metre temperature (base 18°C).
+- **German public holidays** — binary flag for national holidays, which shift demand patterns independently of day-of-week.
+
+```{r}
+#| label: german-holidays
+
+# --- German public holidays (federal, all states) ---
+de_holidays <- function(years) {
+  hols <- character()
+  for (y in years) {
+    # Moving holidays from timeDate
+    moving <- as.Date(c(
+      timeDate::GoodFriday(y),
+      timeDate::EasterMonday(y),
+      timeDate::DEAscension(y),
+      timeDate::PentecostMonday(y),
+      timeDate::DEGermanUnity(y)
+    ))
+    # Fixed holidays
+    fixed <- as.Date(as.timeDate(paste0(y, c("-01-01", "-05-01", "-12-25", "-12-26"))))
+    hols <- c(hols, as.character(c(moving, fixed)))
+  }
+  as.Date(unique(hols))
+}
+
+holiday_dates <- de_holidays(2020:2025)
+cat("German public holidays generated:", length(holiday_dates), "days\n")
+```
 
 ```{r}
 #| label: feature-engineering
@@ -293,6 +410,7 @@ price_df <- smard |>
     renewable_gen   = wind_onshore + wind_offshore + solar,
     renewable_share = renewable_gen / total_load,
     residual_load   = total_load - renewable_gen,
+    thermal_gen     = biomass + gas + hard_coal + lignite,
     date   = as_date(datetime_utc),
     month  = month(datetime_utc),
     hour   = hour(datetime_utc),
@@ -302,20 +420,30 @@ price_df <- smard |>
       month %in% 3:5         ~ "Spring",
       month %in% 6:8         ~ "Summer",
       month %in% 9:11        ~ "Autumn"
-    ) |> factor(levels = c("Winter", "Spring", "Summer", "Autumn"))
+    ) |> factor(levels = c("Winter", "Spring", "Summer", "Autumn")),
+    is_holiday = as.integer(date %in% holiday_dates)
   ) |>
   # Join net exports
   left_join(net_exports, by = "datetime_utc") |>
   # Join TTF (daily step series — forward-fill weekends/holidays)
   left_join(ttf_daily, by = "date") |>
   arrange(datetime_utc) |>
-  fill(ttf_eur_mwh, .direction = "down")
+  fill(ttf_eur_mwh, .direction = "down") |>
+  fill(ttf_change, .direction = "down") |>
+  # Join ERA5 weather
+  left_join(
+    era5 |> select(datetime_utc, ssrd_wm2, hdd, cdd),
+    by = "datetime_utc"
+  ) |>
+  # Renewable ramp rate (hour-over-hour change in renewable share)
+  mutate(renewable_ramp = renewable_share - lag(renewable_share))
 
 # --- Summary ---
 cat("\nFeature table:", nrow(price_df), "rows\n")
 cat("NAs after join:\n")
 price_df |>
-  summarise(across(c(renewable_share, residual_load, net_export_mw, ttf_eur_mwh),
+  summarise(across(c(renewable_share, residual_load, net_export_mw, ttf_eur_mwh,
+                     ttf_change, thermal_gen, renewable_ramp, ssrd_wm2, hdd, cdd),
                    ~ sum(is.na(.)))) |>
   glimpse()
 ```
@@ -327,23 +455,33 @@ price_df |>
 # Impute remaining feature gaps rather than dropping rows.
 # TTF: back-fill leading NAs (before first trading day); the forward-fill
 #   above already handles weekends/holidays.
-# Net exports, renewable share, residual load: Kalman smoothing on a
-#   structural time series model (imputeTS) — respects the autocorrelation
-#   structure of hourly energy data better than linear interpolation.
+# Net exports, renewable share, residual load, thermal gen: Kalman smoothing
+#   on a structural time series model (imputeTS) — respects the
+#   autocorrelation structure of hourly energy data better than linear
+#   interpolation.
+# Weather features (ssrd, hdd, cdd): Kalman smoothing.
+# Renewable ramp: re-compute after imputing renewable share.
 # Nuclear is NOT imputed — post-April-2023 NAs/zeros reflect the actual
 #   phase-out of German nuclear generation.
 
 price_df <- price_df |>
   arrange(datetime_utc) |>
   fill(ttf_eur_mwh, .direction = "downup") |>
+  fill(ttf_change, .direction = "downup") |>
   mutate(across(
-    c(renewable_share, residual_load, net_export_mw),
+    c(renewable_share, residual_load, net_export_mw, thermal_gen,
+      ssrd_wm2, hdd, cdd),
     ~ imputeTS::na_kalman(., model = "StructTS", smooth = TRUE)
-  ))
+  )) |>
+  # Re-derive renewable ramp after imputation
+  mutate(renewable_ramp = renewable_share - lag(renewable_share)) |>
+  # Fill the first-row NA from lag
+  mutate(renewable_ramp = replace_na(renewable_ramp, 0))
 
 remaining_na <- price_df |>
   summarise(across(c(price_de_lu, renewable_share, residual_load,
-                     net_export_mw, ttf_eur_mwh),
+                     net_export_mw, ttf_eur_mwh, ttf_change,
+                     thermal_gen, renewable_ramp, ssrd_wm2, hdd, cdd),
                    ~ sum(is.na(.))))
 
 cat("Rows retained:", nrow(price_df), "\n")
@@ -358,7 +496,7 @@ cat("Final rows (after dropping missing prices):", nrow(price_df))
 
 # 5.0 Exploratory Analysis — Constructed Features {#sec-eda-features}
 
-Now that the features are built, we inspect their relationships with price before modelling.
+With all features constructed, we examine their bivariate relationships with the day-ahead price and their inter-correlations.
 
 ## 5.1 Price vs Renewable Share by Season
 
@@ -369,12 +507,10 @@ Now that the features are built, we inspect their relationships with price befor
 price_df |>
   ggplot(aes(renewable_share, price_de_lu)) +
   geom_hex(bins = 60) +
-  geom_smooth(method = "lm", colour = "#E63946", se = FALSE, linewidth = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, colour = "#E63946", linewidth = 0.7) +
   facet_wrap(~ season) +
   scale_fill_viridis_c(option = "mako", trans = "log10", name = "Count") +
-  coord_cartesian(ylim = c(-50, 300)) +
-  scale_x_continuous(labels = scales::percent_format()) +
-  labs(title = "Price vs Renewable Share by Season",
+  labs(title = "Price vs Renewable Share — by Season",
        x = "Renewable Share (wind + solar / load)", y = "EUR/MWh")
 ```
 
@@ -385,14 +521,13 @@ price_df |>
 #| fig-cap: "Price increases non-linearly with residual load — the merit order curve steepens as thermal capacity tightens."
 
 price_df |>
-  ggplot(aes(residual_load / 1e3, price_de_lu)) +
-  geom_hex(bins = 80) +
-  geom_smooth(method = "gam", formula = y ~ s(x), colour = "#E63946",
-              se = FALSE, linewidth = 0.7) +
+  ggplot(aes(residual_load, price_de_lu)) +
+  geom_hex(bins = 60) +
+  geom_smooth(method = "lm", se = FALSE, colour = "#E63946", linewidth = 0.7) +
+  facet_wrap(~ season) +
   scale_fill_viridis_c(option = "mako", trans = "log10", name = "Count") +
-  coord_cartesian(ylim = c(-50, 400)) +
-  labs(title = "Price vs Residual Load",
-       x = "Residual Load (GW)", y = "EUR/MWh")
+  labs(title = "Price vs Residual Load — by Season",
+       x = "Residual Load (MW)", y = "EUR/MWh")
 ```
 
 ## 5.3 Price vs Net Exports
@@ -402,24 +537,26 @@ price_df |>
 #| fig-cap: "When Germany is a net exporter (positive values), domestic supply is tighter and prices tend to be higher."
 
 price_df |>
-  ggplot(aes(net_export_mw / 1e3, price_de_lu)) +
-  geom_hex(bins = 80) +
-  geom_smooth(method = "gam", formula = y ~ s(x), colour = "#E63946",
-              se = FALSE, linewidth = 0.7) +
+  ggplot(aes(net_export_mw, price_de_lu)) +
+  geom_hex(bins = 60) +
+  geom_smooth(method = "lm", se = FALSE, colour = "#E63946", linewidth = 0.7) +
+  facet_wrap(~ season) +
   scale_fill_viridis_c(option = "mako", trans = "log10", name = "Count") +
-  coord_cartesian(ylim = c(-50, 400)) +
-  labs(title = "Price vs Net Export Position",
-       x = "Net Exports (GW) — positive = exporting", y = "EUR/MWh")
+  labs(title = "Price vs Net Exports — by Season",
+       x = "Net Exports (MW, positive = exporting)", y = "EUR/MWh")
 ```
 
 ## 5.4 Feature Correlation Matrix
 
 ```{r}
 #| label: fig-corr-matrix
-#| fig-cap: "Correlation among model features. Renewable share and residual load are strongly negatively correlated by construction — this is expected and handled by the lasso."
+#| fig-cap: "Correlation among model features. Renewable share and residual load are strongly negatively correlated by construction. HDD and CDD are near-orthogonal, capturing distinct seasonal demand channels."
+#| fig-height: 8
 
 cor_vars <- price_df |>
-  select(price_de_lu, renewable_share, residual_load, net_export_mw, ttf_eur_mwh)
+  select(price_de_lu, renewable_share, residual_load, net_export_mw,
+         ttf_eur_mwh, ttf_change, thermal_gen, renewable_ramp,
+         ssrd_wm2, hdd, cdd)
 
 cor_mat <- cor(cor_vars, use = "complete.obs")
 
@@ -432,7 +569,7 @@ cor_mat |>
   ) |>
   ggplot(aes(var1, var2, fill = r)) +
   geom_tile() +
-  geom_text(aes(label = round(r, 2)), size = 3.5) +
+  geom_text(aes(label = round(r, 2)), size = 2.8) +
   scale_fill_gradient2(low = "#457B9D", mid = "white", high = "#E63946",
                        midpoint = 0, limits = c(-1, 1), name = "r") +
   labs(title = "Feature Correlation Matrix", x = NULL, y = NULL) +
@@ -473,7 +610,8 @@ Before fitting the price model, we check the standard regression assumptions aga
 #| label: diagnostics-ols-prelim
 
 diag_fml <- price_de_lu ~ renewable_share + residual_load + net_export_mw +
-  ttf_eur_mwh + season + dow + hour
+  ttf_eur_mwh + ttf_change + thermal_gen + renewable_ramp +
+  ssrd_wm2 + hdd + cdd + is_holiday + season + dow + hour
 diag_fit <- lm(diag_fml, data = train_df)
 ```
 
@@ -542,7 +680,7 @@ if (bp_test$p.value < 0.05) {
 ::: {.callout-note title="Diagnostic Summary"}
 The diagnostics reveal two features typical of electricity price data:
 
-1. **Multicollinearity** between renewable share and residual load (mechanically linked via total load). A **lasso** penalty addresses this by zeroing out redundant terms.
+1. **Multicollinearity** between renewable share and residual load (mechanically linked via total load), and between thermal generation and residual load (thermal plants fill the residual demand gap). A **lasso** penalty addresses this by zeroing out redundant terms.
 2. **Heteroskedasticity** — residual variance scales with price level. This is a structural feature of electricity markets, not a model failure. **HC-robust standard errors** (sandwich estimator) ensure valid inference. The model operates in raw EUR/MWh for full interpretability.
 
 These findings motivate the modelling choices in the next section.
@@ -551,11 +689,11 @@ These findings motivate the modelling choices in the next section.
 
 # 8.0 Price Regression {#sec-regression}
 
-We fit three models and compare them via rolling-window cross-validation:
+We fit three models and compare them via expanding-window cross-validation:
 
-1. **Lasso with interactions** — interpretable, coefficient-based. The L1 penalty produces a sparse model by zeroing out redundant terms. All numeric predictors are normalised so coefficients read as EUR/MWh per 1-SD change.
+1. **Lasso with interactions** — interpretable, coefficient-based. The L1 penalty produces a sparse model by zeroing out redundant terms. Hour × season dummies replace sinusoidal encoding for richer temporal resolution. Polynomial residual load and TTF × residual load interactions capture non-linear merit-order effects.
 2. **Boosted tree (XGBoost, mean)** — flexible, non-parametric benchmark. Captures non-linearities and higher-order interactions the lasso cannot.
-3. **Quantile XGBoost (q5, q50, q95)** — targets specific percentiles, producing a 90% prediction interval that captures tail events the mean models miss. Feeds directly into the Stage 3 VaR/CVaR framework.
+3. **Quantile XGBoost (q5, q50, q95)** — targets specific percentiles, producing a 90% prediction interval that captures tail events the mean models miss. Feeds directly into the Stage 4 VaR/CVaR framework.
 
 The lasso is the primary model for the variance decomposition; the boosted trees serve as performance benchmarks and provide distributional predictions for risk analysis.
 
@@ -564,28 +702,33 @@ The lasso is the primary model for the variance decomposition; the boosted trees
 ```{r}
 #| label: recipes
 
-# --- Lasso recipe: cyclical encoding, interactions, normalisation ---
+# --- Lasso recipe: hour × season dummies, interactions, normalisation ---
 lasso_recipe <- recipe(
   price_de_lu ~ renewable_share + residual_load + net_export_mw +
-    ttf_eur_mwh + season + dow + hour,
+    ttf_eur_mwh + ttf_change + thermal_gen + renewable_ramp +
+    ssrd_wm2 + hdd + cdd + is_holiday + season + dow + hour,
   data = train_df
 ) |>
-  step_mutate(
-    hour_sin_24 = sin(2 * pi * hour / 24),
-    hour_cos_24 = cos(2 * pi * hour / 24),
-    hour_sin_12 = sin(4 * pi * hour / 24),
-    hour_cos_12 = cos(4 * pi * hour / 24)
-  ) |>
+  # Convert hour to factor for dummy encoding
+  step_mutate(hour_f = factor(hour)) |>
   step_rm(hour) |>
-  step_dummy(season, dow) |>
+  # Polynomial residual load (quadratic — captures merit-order curvature)
+  step_poly(residual_load, degree = 2, options = list(raw = TRUE)) |>
+  # Dummy encoding
+  step_dummy(season, dow, hour_f) |>
+  # Key interactions
   step_interact(terms = ~ renewable_share:starts_with("season_")) |>
-  step_interact(terms = ~ starts_with("hour_"):starts_with("season_")) |>
+  step_interact(terms = ~ starts_with("hour_f_"):starts_with("season_")) |>
+  step_interact(terms = ~ ttf_eur_mwh:residual_load_poly_1) |>
+  step_interact(terms = ~ net_export_mw:starts_with("season_")) |>
+  # Normalise all predictors
   step_normalize(all_numeric_predictors())
 
 # --- XGBoost recipe: trees handle non-linearities natively ---
 xgb_recipe <- recipe(
   price_de_lu ~ renewable_share + residual_load + net_export_mw +
-    ttf_eur_mwh + season + dow + hour,
+    ttf_eur_mwh + ttf_change + thermal_gen + renewable_ramp +
+    ssrd_wm2 + hdd + cdd + is_holiday + season + dow + hour,
   data = train_df
 ) |>
   step_dummy(season, dow)
@@ -634,20 +777,22 @@ xgb_q50_wf <- workflow() |> add_recipe(xgb_recipe) |> add_model(xgb_q50_spec)
 xgb_q95_wf <- workflow() |> add_recipe(xgb_recipe) |> add_model(xgb_q95_spec)
 ```
 
-## 8.3 Rolling-Window Cross-Validation
+## 8.3 Expanding-Window Cross-Validation
+
+We use an expanding window (`cumulative = TRUE`) rather than a fixed-width rolling window. This means each successive fold trains on all prior data, better reflecting how a production model would be updated: you always retrain on the full history available at that point.
 
 ```{r}
-#| label: rolling-cv
+#| label: expanding-cv
 
-rolling_splits <- rolling_origin(
+expanding_splits <- rolling_origin(
   train_df,
   initial  = 365 * 24,
   assess   = 30 * 24,
   skip     = 30 * 24,
-  cumulative = FALSE
+  cumulative = TRUE
 )
 
-cat("Rolling CV folds:", nrow(rolling_splits))
+cat("Expanding CV folds:", nrow(expanding_splits))
 ```
 
 ```{r}
@@ -661,33 +806,34 @@ lasso_grid <- grid_regular(penalty(range = c(-2, 1)), levels = 20)
 
 lasso_tune <- tune_grid(
   lasso_wf,
-  resamples = rolling_splits,
+  resamples = expanding_splits,
   grid      = lasso_grid,
   metrics   = cv_metrics
 )
 
 # --- XGBoost (mean): no tuning ---
-xgb_cv <- fit_resamples(xgb_wf, resamples = rolling_splits, metrics = cv_metrics)
+xgb_cv <- fit_resamples(xgb_wf, resamples = expanding_splits, metrics = cv_metrics)
 
 # --- Select best lasso penalty ---
 best_lasso <- select_best(lasso_tune, metric = "rmse")
-cat("\nBest lasso penalty:", best_lasso$penalty, "\n")
+cat("Best lasso penalty:", best_lasso$penalty, "\n")
 
 lasso_wf_final <- finalize_workflow(lasso_wf, best_lasso)
 ```
 
 ```{r}
 #| label: tbl-cv-results
-#| tbl-cap: "Rolling CV performance (EUR/MWh)."
+#| tbl-cap: "Expanding CV performance (EUR/MWh)."
 
 bind_rows(
   collect_metrics(lasso_tune) |>
-    semi_join(best_lasso, by = "penalty") |>
+    filter(penalty == best_lasso$penalty) |>
     mutate(model = "Lasso"),
-  collect_metrics(xgb_cv) |> mutate(model = "XGBoost")
+  collect_metrics(xgb_cv) |>
+    mutate(model = "XGBoost (mean)")
 ) |>
-  select(model, .metric, mean, std_err) |>
-  pivot_wider(names_from = .metric, values_from = c(mean, std_err)) |>
+  select(model, .metric, mean) |>
+  pivot_wider(names_from = .metric, values_from = mean) |>
   knitr::kable(digits = 2)
 ```
 
@@ -899,11 +1045,136 @@ robust_coefs |>
 ```
 
 
+## 8.9 Post-Crisis Elastic Net (2023-2025) {#sec-post-crisis-model}
+
+The full-sample model is dominated by the 2022 energy crisis, which compresses the explanatory power of all non-gas features. Here we refit the lasso on the post-crisis period only (2023-2025), where gas prices are stable and the merit-order drivers that matter for forward-looking hedging are more clearly identified. We compare test-set performance with the full-sample model to assess whether a regime-specific model improves out-of-sample accuracy in the current market environment.
+
+```{r}
+#| label: post-crisis-split
+
+price_post <- price_df |>
+  filter(datetime_utc >= as.POSIXct("2023-01-01", tz = "UTC"))
+
+# 80/20 temporal split within the post-crisis period
+split_date_post <- quantile(as.numeric(price_post$datetime_utc), 0.8) |>
+  as.POSIXct(origin = "1970-01-01", tz = "UTC")
+
+train_post <- price_post |> filter(datetime_utc < split_date_post)
+test_post  <- price_post |> filter(datetime_utc >= split_date_post)
+
+cat(
+  "Post-crisis train:", nrow(train_post), "rows |",
+  as.character(min(train_post$datetime_utc)), "to",
+  as.character(max(train_post$datetime_utc)), "\n",
+  "Post-crisis test: ", nrow(test_post), "rows |",
+  as.character(min(test_post$datetime_utc)), "to",
+  as.character(max(test_post$datetime_utc))
+)
+```
+
+```{r}
+#| label: post-crisis-fit
+#| cache: true
+
+# Build recipe on post-crisis training data
+lasso_recipe_post <- recipe(
+  price_de_lu ~ renewable_share + residual_load + net_export_mw +
+    ttf_eur_mwh + ttf_change + thermal_gen + renewable_ramp +
+    ssrd_wm2 + hdd + cdd + is_holiday + season + dow + hour,
+  data = train_post
+) |>
+  step_mutate(hour_f = factor(hour)) |>
+  step_rm(hour) |>
+  step_poly(residual_load, degree = 2, options = list(raw = TRUE)) |>
+  step_dummy(season, dow, hour_f) |>
+  step_interact(terms = ~ renewable_share:starts_with("season_")) |>
+  step_interact(terms = ~ starts_with("hour_f_"):starts_with("season_")) |>
+  step_interact(terms = ~ ttf_eur_mwh:residual_load_poly_1) |>
+  step_interact(terms = ~ net_export_mw:starts_with("season_")) |>
+  step_normalize(all_numeric_predictors())
+
+# Tune penalty via expanding CV on post-crisis data
+expanding_post <- rolling_origin(
+  train_post,
+  initial    = 180 * 24,
+  assess     = 30 * 24,
+  skip       = 30 * 24,
+  cumulative = TRUE
+)
+
+lasso_wf_post <- workflow() |>
+  add_recipe(lasso_recipe_post) |>
+  add_model(lasso_spec)
+
+lasso_tune_post <- tune_grid(
+  lasso_wf_post,
+  resamples = expanding_post,
+  grid      = lasso_grid,
+  metrics   = cv_metrics
+)
+
+best_lasso_post <- select_best(lasso_tune_post, metric = "rmse")
+cat("Best post-crisis lasso penalty:", best_lasso_post$penalty, "\n")
+
+lasso_wf_post_final <- finalize_workflow(lasso_wf_post, best_lasso_post)
+lasso_fit_post <- fit(lasso_wf_post_final, data = train_post)
+```
+
+```{r}
+#| label: tbl-post-crisis-comparison
+#| tbl-cap: "Test-set comparison: full-sample vs post-crisis lasso on the post-crisis test period."
+
+# Both models predict on the same post-crisis test set
+post_preds <- test_post |>
+  select(datetime_utc, price_de_lu, season) |>
+  mutate(
+    pred_full = predict(lasso_fit, new_data = test_post)$.pred,
+    pred_post = predict(lasso_fit_post, new_data = test_post)$.pred
+  )
+
+bind_rows(
+  post_preds |> metrics(truth = price_de_lu, estimate = pred_full) |>
+    mutate(model = "Full-sample lasso"),
+  post_preds |> metrics(truth = price_de_lu, estimate = pred_post) |>
+    mutate(model = "Post-crisis lasso")
+) |>
+  select(model, .metric, .estimate) |>
+  pivot_wider(names_from = .metric, values_from = .estimate) |>
+  knitr::kable(digits = 2)
+```
+
+::: {.callout-note title="Interpreting the Post-Crisis Model"}
+If the post-crisis lasso outperforms the full-sample model on this test set, it suggests the 2022 crisis period introduced coefficient bias that hurts forecasting in the current regime. This is the model a hedging desk would deploy today — trained only on the market environment that reflects current gas price levels and renewable capacity. Both models are serialised for use in Stage 4 risk quantification, allowing side-by-side VaR comparisons.
+:::
+
+```{r}
+#| label: save-models
+
+# --- Serialise all models for Stage 4 ---
+dir.create("models", showWarnings = FALSE)
+
+saveRDS(lasso_fit, "models/price_lasso_DE-LU.rds")
+saveRDS(lasso_fit_post, "models/price_lasso_post_DE-LU.rds")
+saveRDS(xgb_q05_fit, "models/price_xgb_q05_DE-LU.rds")
+saveRDS(xgb_q95_fit, "models/price_xgb_q95_DE-LU.rds")
+
+cat(
+  "Models saved to models/:\n",
+  " - price_lasso_DE-LU.rds (full-sample lasso)\n",
+  " - price_lasso_post_DE-LU.rds (post-crisis lasso)\n",
+  " - price_xgb_q05_DE-LU.rds (quantile XGB q05)\n",
+  " - price_xgb_q95_DE-LU.rds (quantile XGB q95)\n"
+)
+```
+
+
 # 9.0 Variance Decomposition {#sec-decomposition}
 
 This is the centrepiece exhibit. We quantify how much of day-ahead price variance each driver explains, and show how the attribution shifts by season.
 
 The decomposition is presented in two panels. First, the **full sample (2020-2025)** provides context: the 2021-22 gas crisis dominates overall variance, with TTF swamping all other drivers. Second, the **post-crisis subset (2023-2025)** isolates the stable gas-price regime where renewable variability, residual load, and temporal patterns emerge as the primary merit-order drivers. This second panel reflects the market environment a hedging desk faces today.
+
+The expanded feature set is decomposed into **eight groups** — up from five in the original specification. The additional groups (weather, thermal dispatch, renewable ramp) isolate channels that were previously absorbed into the renewable share and residual load terms, producing a more granular attribution.
 
 ## 9.1 Full Sample — Partial R-squared by Season
 
@@ -911,30 +1182,32 @@ The decomposition is presented in two panels. First, the **full sample (2020-202
 #| label: partial-r2-full
 #| cache: true
 
-# Helper function for partial R-squared decomposition
+# Helper function for partial R-squared decomposition (8 feature groups)
 compute_partial_r2 <- function(df, response = "price_de_lu") {
 
+  # Create hour dummies within-season (factor, not sinusoidal)
   df <- df |>
-    mutate(
-      hour_sin_24 = sin(2 * pi * hour / 24),
-      hour_cos_24 = cos(2 * pi * hour / 24),
-      hour_sin_12 = sin(4 * pi * hour / 24),
-      hour_cos_12 = cos(4 * pi * hour / 24)
-    )
+    mutate(hour_f = factor(hour))
 
   full_fml <- reformulate(
-    c("renewable_share", "residual_load", "net_export_mw", "ttf_eur_mwh",
-      "dow", "hour_sin_24", "hour_cos_24", "hour_sin_12", "hour_cos_12"),
+    c("renewable_share", "residual_load", "net_export_mw",
+      "ttf_eur_mwh", "ttf_change",
+      "ssrd_wm2", "hdd", "cdd",
+      "thermal_gen",
+      "renewable_ramp",
+      "hour_f", "dow", "is_holiday"),
     response = response
   )
 
   feature_groups <- list(
-    "Renewable share" = "renewable_share",
-    "Residual load"   = "residual_load",
-    "Net exports"     = "net_export_mw",
-    "Gas price (TTF)" = "ttf_eur_mwh",
-    "Temporal (hour + dow)" = c("dow", "hour_sin_24", "hour_cos_24",
-                                 "hour_sin_12", "hour_cos_12")
+    "Renewable share"  = "renewable_share",
+    "Residual load"    = "residual_load",
+    "Net exports"      = "net_export_mw",
+    "Gas price (TTF)"  = c("ttf_eur_mwh", "ttf_change"),
+    "Weather (solar, HDD/CDD)" = c("ssrd_wm2", "hdd", "cdd"),
+    "Thermal dispatch"  = "thermal_gen",
+    "Renewable ramp"    = "renewable_ramp",
+    "Temporal (hour x season + dow + holiday)" = c("hour_f", "dow", "is_holiday")
   )
 
   map_dfr(levels(df$season), function(s) {
@@ -988,15 +1261,15 @@ With TTF stabilised in the 30-55 EUR/MWh range since mid-2022, the merit-order d
 #| label: partial-r2-post
 #| cache: true
 
-price_post <- price_df |> filter(datetime_utc >= as.POSIXct("2023-01-01", tz = "UTC"))
-cat("Post-crisis rows:", nrow(price_post), "\n")
+price_post_r2 <- price_df |> filter(datetime_utc >= as.POSIXct("2023-01-01", tz = "UTC"))
+cat("Post-crisis rows:", nrow(price_post_r2), "\n")
 
-partial_r2_post <- compute_partial_r2(price_post)
+partial_r2_post <- compute_partial_r2(price_post_r2)
 ```
 
 ```{r}
 #| label: fig-partial-r2-post
-#| fig-cap: "Post-crisis (2023-2025): with gas prices stabilised, renewable share and residual load emerge as the primary price drivers. The seasonal pattern is clear — renewables dominate summer, residual load dominates shoulder seasons."
+#| fig-cap: "Post-crisis (2023-2025): with gas prices stabilised, renewable share and residual load emerge as the primary price drivers. Weather (solar, HDD/CDD) and thermal dispatch now contribute measurably. The seasonal pattern is clear — renewables dominate summer, residual load dominates shoulder seasons."
 #| fig-height: 7
 
 partial_r2_post |>
@@ -1020,7 +1293,7 @@ partial_r2_post |>
 
 ```{r}
 #| label: tbl-partial-r2-both
-#| tbl-cap: "Partial R-squared comparison: full sample vs post-crisis, by season."
+#| tbl-cap: "Partial R-squared comparison: full sample vs post-crisis, by season and feature group."
 
 bind_rows(
   partial_r2_full |> mutate(period = "Full (2020-2025)"),
@@ -1093,14 +1366,17 @@ feat_imp$results |>
 2. **In the post-crisis market (2023-2025), renewable variability and residual load emerge as the primary drivers.** With gas prices stabilised, the merit-order effects that shape day-ahead pricing become visible.
 3. **Renewable share dominates summer price variance** in the post-crisis period, when solar generation swings prices between midday troughs and evening peaks.
 4. **Residual load is most important in shoulder seasons** (spring, autumn), when neither renewable nor gas effects dominate.
-5. **Net exports have a measurable but secondary effect**, consistent with Germany's central position in the CWE interconnected market.
-6. **Temporal patterns (hour, day-of-week) capture structural demand cycles** — contributing consistently across all seasons.
-7. **Heteroskedasticity is a structural feature of electricity markets**, not a model failure. All results are reported in raw EUR/MWh with HC-robust standard errors for valid inference.
-8. **Negative prices are preserved in the model** — they reflect conventional inflexibility during renewable oversupply and are economically important for hedging.
-9. **Quantile XGBoost provides distributional predictions** for risk analysis, producing a 90% prediction interval that brackets extreme price events. These feed directly into the Stage 3 VaR/CVaR framework.
+5. **Net exports have a measurable but secondary effect**, consistent with Germany's central position in the CWE interconnected market. The net export × season interaction reveals that exports tighten supply most in winter when neighbouring zones draw on German baseload.
+6. **Thermal dispatch captures information beyond residual load.** The combined output of biomass, gas, hard coal, and lignite plants reflects generator-level commitment decisions (must-run, CHP obligations) that residual load alone does not capture.
+7. **Weather variables (solar irradiance, HDD/CDD) add explanatory power** on top of renewable share, because they capture the *demand-side* weather channel (heating and cooling load) independently from the supply-side channel already embedded in renewable generation.
+8. **Renewable ramp rates contribute to intra-day price volatility**, particularly during evening ramp-down of solar in summer and rapid wind changes in autumn. The hour-over-hour change in renewable share explains a small but distinct fraction of variance that the level of renewable share misses.
+9. **Temporal patterns (hour × season dummies, day-of-week, holidays) capture structural demand cycles** — contributing consistently across all seasons. German public holidays shift demand patterns independently of day-of-week effects.
+10. **Heteroskedasticity is a structural feature of electricity markets**, not a model failure. All results are reported in raw EUR/MWh with HC-robust standard errors for valid inference. The ADF test confirms the price series is stationary, validating regression on levels.
+11. **The post-crisis lasso (2023-2025) provides a regime-specific benchmark** for the current market. Comparing its test-set performance against the full-sample model reveals whether the 2022 crisis period introduces coefficient bias that hurts forecasting under stable gas prices.
+12. **Quantile XGBoost provides distributional predictions** for risk analysis, producing a 90% prediction interval that brackets extreme price events. These feed directly into the Stage 4 VaR/CVaR framework alongside the post-crisis lasso.
 :::
 
-These findings inform the risk quantification in the next section: the seasonal attribution structure means that a hedging strategy must account for *which* risk factor dominates in the delivery period. In today's market, a summer forward position is primarily a renewable variability bet; shoulder-season contracts depend on residual load dynamics; and the ever-present tail risk of another fuel cost shock requires monitoring through the quantile framework.
+These findings inform the risk quantification in the next section: the seasonal attribution structure means that a hedging strategy must account for *which* risk factor dominates in the delivery period. In today's market, a summer forward position is primarily a renewable variability bet; shoulder-season contracts depend on residual load dynamics; weather-driven demand (HDD/CDD) adds an independent risk channel in winter and summer; and the ever-present tail risk of another fuel cost shock requires monitoring through the quantile framework.
 
 
 ::: {.callout-note title="Data Attribution"}

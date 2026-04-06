@@ -411,6 +411,36 @@ dispatchable thermal and imported power — and thereby amplifying the
 price sensitivity to renewable variability that Stage 2 aims to quantify.
 :::
 
+```{r}
+#| label: fig-nuclear-phaseout
+#| fig-cap: "German nuclear generation (DE-LU, monthly average MW). The two-step phase-out — December 2021 and April 2023 — is clearly visible as structural breaks, not data quality issues."
+#| fig-width: 10
+#| fig-height: 4
+#| code-summary: "Nuclear phase-out time series"
+
+smard |>
+  mutate(month = lubridate::floor_date(datetime_utc, "month")) |>
+  group_by(month) |>
+  summarise(nuclear_avg_mw = mean(nuclear, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = month, y = nuclear_avg_mw / 1e3)) +
+  geom_line(colour = "steelblue", linewidth = 0.7) +
+  geom_area(alpha = 0.15, fill = "steelblue") +
+  geom_vline(xintercept = as.POSIXct("2021-12-31"), linetype = "dashed",
+             colour = "firebrick", linewidth = 0.5) +
+  geom_vline(xintercept = as.POSIXct("2023-04-15"), linetype = "dashed",
+             colour = "firebrick", linewidth = 0.5) +
+  annotate("text", x = as.POSIXct("2021-12-31"), y = 6, label = "3 reactors\nshut down",
+           hjust = 1.1, size = 3, colour = "firebrick") +
+  annotate("text", x = as.POSIXct("2023-04-15"), y = 4, label = "Final 3\ndisconnected",
+           hjust = -0.1, size = 3, colour = "firebrick") +
+  labs(
+    title = "German Nuclear Generation — Atomausstieg",
+    subtitle = "Monthly average generation showing the two-step phase-out",
+    x = NULL, y = "Average Generation (GW)",
+    caption = "Source: SMARD / Bundesnetzagentur (CC BY 4.0)"
+  )
+```
+
 
 ## 4.0 Alignment & readiness {#sec-alignment}
 
@@ -428,3 +458,36 @@ below summarises alignment status:
 The data are ready for Stage 1 (Weather → Generation modelling) without
 further cleaning. The cross-border flow gaps are the only irregularity and
 are handled by construction in the net-export feature (Stage 2).
+
+
+### 4.1 Variables passed downstream {#sec-downstream}
+
+The table below documents which raw variables are consumed by each downstream
+stage and which derived features are constructed along the way. This serves as
+an audit trail linking the raw data inventory above to the analytical choices
+in Stages 1–3.
+
+| Variable | Source | Used in | Role |
+|----------|--------|---------|------|
+| `wind_onshore`, `wind_offshore`, `solar` | SMARD | Stage 1 (CF models), Stage 2 (renewable share, residual load) | Generation targets and feature construction |
+| `biomass`, `gas`, `hard_coal`, `lignite` | SMARD | Stage 2 (price features) | Thermal dispatch indicators — capture merit-order position beyond residual load |
+| `nuclear` | SMARD | Stage 2 (price features, pre-April 2023 only) | Baseload generation; NAs post-phase-out are structural, not imputed |
+| `total_load` | SMARD | Stage 2 (residual load, renewable share) | Demand side of the merit order |
+| `price_de_lu` | SMARD | Stage 2 (target variable) | Day-ahead clearing price |
+| `wind_speed_100m`, `wind_speed_10m` | ERA5 | Stage 1 (CF models) | Hub-height wind resource |
+| `ssrd_wm2` | ERA5 | Stage 1 (solar CF model), Stage 2 (price feature) | Solar irradiance — both a CF driver and a direct price-relevant signal |
+| `temperature_2m` | ERA5 | Stage 1 (solar CF), Stage 2 (→ HDD/CDD) | PV efficiency correction; heating/cooling degree days derived in Stage 2 |
+| Cross-border flows | ENTSO-E | Stage 2 (net export balance) | Supply tightness indicator |
+| Day-ahead prices (multi-zone) | ENTSO-E | Stage 3 (cross-zone correlation, DK comparison) | Portfolio diversification analysis |
+| TTF gas price | Yahoo Finance | Stage 2 (price feature) | Marginal fuel cost proxy |
+
+::: {.callout-note title="HDD/CDD derivation"}
+Heating degree days (HDD) and cooling degree days (CDD) are derived from ERA5
+2 m temperature in Stage 2 using a standard 18 °C base temperature:
+`HDD = max(18 - T, 0)` and `CDD = max(T - 18, 0)`. These capture
+temperature-driven load effects (heating demand in winter, cooling demand in
+summer) that the raw temperature variable does not represent directly. The
+derivation is performed at the point of feature engineering rather than here
+in Stage 0, because it is a modelling choice rather than a data-processing
+step.
+:::

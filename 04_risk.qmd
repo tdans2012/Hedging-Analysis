@@ -34,6 +34,7 @@ library(glue)
 library(gt)
 library(imputeTS)
 library(scales)
+library(timeDate)  # German public holidays
 
 # ── Theme ─────────────────────────────────────────────────────────────
 theme_report <- theme_minimal(base_size = 12) +
@@ -53,7 +54,8 @@ season_colours <- c(
 
 variant_colours <- c(
   "Weather-only" = "#4393C3",
-  "Full historical" = "#D6604D"
+  "Full historical" = "#D6604D",
+  "Realized" = "#1B7837"
 )
 ```
 
@@ -69,13 +71,27 @@ smard <- read_parquet("data/processed/smard/smard_DE-LU_2020_2025.parquet") |>
 era5_delu <- read_parquet("data/processed/era5/DE-LU.parquet") |>
   mutate(datetime_utc = as.POSIXct(datetime_utc, tz = "UTC"))
 
+# Check temperature units and convert from Kelvin if needed
+if (max(era5_delu$temperature_2m, na.rm = TRUE) > 100) {
+  era5_delu <- era5_delu |> mutate(temperature_2m = temperature_2m - 273.15)
+}
+
+# Derive HDD and CDD (base 18°C)
+era5_delu <- era5_delu |>
+  mutate(
+    hdd = pmax(0, 18 - temperature_2m),
+    cdd = pmax(0, temperature_2m - 18)
+  )
+
 # ── ENTSO-E cross-border flows ───────────────────────────────────────
 flows_raw <- read_parquet("data/processed/entsoe/crossborder_flows_2020_2025.parquet") |>
   mutate(datetime_utc = as.POSIXct(datetime_utc, tz = "UTC"))
 
 # ── TTF gas price ─────────────────────────────────────────────────────
 ttf <- read_parquet("data/processed/ttf/ttf_daily.parquet") |>
-  mutate(date = as.Date(date))
+  mutate(date = as.Date(date)) |>
+  arrange(date) |>
+  mutate(ttf_change = ttf_eur_mwh - lag(ttf_eur_mwh))
 
 # ── ENTSO-E multi-zone prices ─────────────────────────────────────────
 prices_all <- read_parquet("data/processed/entsoe/prices_2020_2025.parquet") |>
@@ -104,8 +120,14 @@ cf_wind_onshore  <- readRDS("models/cf_wind_onshore_DE-LU.rds")
 cf_wind_offshore <- readRDS("models/cf_wind_offshore_DE-LU.rds")
 cf_solar         <- readRDS("models/cf_solar_DE-LU.rds")
 
-# ── Stage 2 price model (elastic net) ────────────────────────────────
-price_model <- readRDS("models/price_enet_DE-LU.rds")
+# ── Stage 3 price models ─────────────────────────────────────────────
+# Full-sample lasso (primary model for Variant A/B predictions)
+price_model      <- readRDS("models/price_lasso_DE-LU.rds")
+# Post-crisis lasso (2023-2025 only — for regime comparison)
+price_model_post <- readRDS("models/price_lasso_post_DE-LU.rds")
+# Quantile XGBoost (for distributional predictions)
+price_xgb_q05    <- readRDS("models/price_xgb_q05_DE-LU.rds")
+price_xgb_q95    <- readRDS("models/price_xgb_q95_DE-LU.rds")
 ```
 
 ```{r}
@@ -133,6 +155,25 @@ compute_cvar <- function(x, level = 0.95) {
   threshold <- compute_var(x, level)
   mean(x[x <= threshold], na.rm = TRUE)
 }
+
+# ── German public holidays ───────────────────────────────────────────
+de_holidays <- function(years) {
+  hols <- character()
+  for (y in years) {
+    moving <- as.Date(c(
+      timeDate::GoodFriday(y),
+      timeDate::EasterMonday(y),
+      timeDate::DEAscension(y),
+      timeDate::PentecostMonday(y),
+      timeDate::DEGermanUnity(y)
+    ))
+    fixed <- as.Date(as.timeDate(paste0(y, c("-01-01", "-05-01", "-12-25", "-12-26"))))
+    hols <- c(hols, as.character(c(moving, fixed)))
+  }
+  as.Date(unique(hols))
+}
+
+holiday_dates <- de_holidays(2020:2025)
 ```
 
 # Portfolio Definition {#sec-portfolio}
@@ -158,14 +199,14 @@ tibble(
 ::: callout-note
 ## What does "fully unhedged" mean?
 
-A wind farm that sells all output on the day-ahead spot market earns revenue = price × generation in each delivery hour. Both sides of this equation are weather-driven: wind speed determines generation volume, while the aggregate wind and solar fleet drives the renewable share that (per Stage 2) is the dominant price factor in summer. This creates a **natural short hedge** — high wind hours produce more MWh but depress the price via the merit order effect. The simulation below quantifies how much residual risk remains after this embedded correlation.
+A wind farm that sells all output on the day-ahead spot market earns revenue = price × generation in each delivery hour. Both sides of this equation are weather-driven: wind speed determines generation volume, while the aggregate wind and solar fleet drives the renewable share that (per Stage 3) is the dominant price factor in summer. This creates a **natural short hedge** — high wind hours produce more MWh but depress the price via the merit order effect. The simulation below quantifies how much residual risk remains after this embedded correlation.
 :::
 
 # Monte Carlo Framework {#sec-montecarlo}
 
 ## Feature Engineering {#sec-features}
 
-We reconstruct the same feature set used in the Stage 2 price model: renewable share, residual load, net export balance, TTF gas price, hour of day, and season.
+We reconstruct the same feature set used in the Stage 3 price model: renewable share, residual load, net export balance, TTF gas price (level and daily change), thermal generation, solar irradiance, HDD/CDD, renewable ramp rate, holidays, hour, day-of-week, and season.
 
 ```{r}
 #| label: de-lu-net-exports
@@ -209,18 +250,26 @@ scenario_df <- smard |>
     renewable_gen = wind_total + solar_total,
     renewable_share = renewable_gen / total_load,
     residual_load = total_load - renewable_gen,
+    thermal_gen = biomass + gas + hard_coal + lignite,
     date = as_date(datetime_utc),
     hour = hour(datetime_utc),
     dow  = wday(datetime_utc, label = TRUE, week_start = 1),
     season = assign_season(datetime_utc),
-    month = factor(month(datetime_utc, label = TRUE), ordered = FALSE)
+    month = factor(month(datetime_utc, label = TRUE), ordered = FALSE),
+    is_holiday = as.integer(date %in% holiday_dates)
   ) |>
-  # Join ERA5 weather
-  left_join(era5_delu, by = "datetime_utc") |>
+  # Join ERA5 weather (ssrd, HDD, CDD)
+  left_join(
+    era5_delu |> select(datetime_utc, ssrd_wm2, hdd, cdd),
+    by = "datetime_utc"
+  ) |>
   # Join cross-border flows
   left_join(flows_delu, by = "datetime_utc") |>
-  # Join TTF gas price (daily → hourly via date)
-  left_join(ttf, by = "date")
+  # Join TTF gas price (daily → hourly via date, includes ttf_change)
+  left_join(ttf, by = "date") |>
+  arrange(datetime_utc) |>
+  # Renewable ramp rate (hour-over-hour change)
+  mutate(renewable_ramp = renewable_share - lag(renewable_share))
 
 cat("Scenario table:", nrow(scenario_df), "rows,",
     sum(complete.cases(scenario_df)), "complete cases\n")
@@ -237,12 +286,24 @@ scenario_df <- scenario_df |>
     renewable_share    = na_kalman(renewable_share, model = "StructTS"),
     residual_load      = na_kalman(residual_load, model = "StructTS"),
     net_export_mw      = na_kalman(net_export_mw, model = "StructTS"),
+    thermal_gen        = na_kalman(thermal_gen, model = "StructTS"),
+    ssrd_wm2           = na_kalman(ssrd_wm2, model = "StructTS"),
+    hdd                = na_kalman(hdd, model = "StructTS"),
+    cdd                = na_kalman(cdd, model = "StructTS"),
     ttf_eur_mwh        = zoo::na.locf(zoo::na.locf(ttf_eur_mwh, na.rm = FALSE),
+                                       fromLast = TRUE),
+    ttf_change         = zoo::na.locf(zoo::na.locf(ttf_change, na.rm = FALSE),
                                        fromLast = TRUE)
+  ) |>
+  # Re-derive renewable ramp after imputation; fill leading NA
+  mutate(
+    renewable_ramp = renewable_share - lag(renewable_share),
+    renewable_ramp = replace_na(renewable_ramp, 0)
   )
 
 n_remaining_na <- scenario_df |>
-  select(renewable_share, residual_load, net_export_mw, ttf_eur_mwh) |>
+  select(renewable_share, residual_load, net_export_mw, ttf_eur_mwh,
+         ttf_change, thermal_gen, ssrd_wm2, hdd, cdd) |>
   summarise(across(everything(), \(x) sum(is.na(x))))
 
 cat("Remaining NAs after imputation:\n")
@@ -253,9 +314,11 @@ print(n_remaining_na)
 
 We pre-compute predicted prices and portfolio generation for every historical hour before resampling. This keeps the Monte Carlo loop fast — it only needs to sample and sum pre-computed daily revenues.
 
-**Variant A (weather-only):** TTF and net export balance fixed at their seasonal medians. Isolates the pure weather-driven component of price risk.
+**Variant A (weather-only):** TTF and net exports fixed at their seasonal medians; TTF change set to zero. Isolates the pure weather-driven component of price risk.
 
 **Variant B (full historical):** All features drawn from the same historical day. Captures total risk including gas price and cross-border flow co-movement.
+
+**Realized:** Actual historical prices (`price_de_lu`) multiplied by predicted generation. This is the ground-truth revenue stream — what the portfolio would have earned on the spot market. Risk metrics (VaR/CVaR) are computed on realized revenue because it represents actual market outcomes rather than model predictions.
 
 ```{r}
 #| label: seasonal-medians
@@ -290,15 +353,23 @@ scenario_df <- scenario_df |>
 
 # ── Variant A: swap in seasonal medians, then predict ────────────────
 scenario_a <- scenario_df |>
-  select(-ttf_eur_mwh, -net_export_mw) |>
+  select(-ttf_eur_mwh, -net_export_mw, -ttf_change) |>
   left_join(seasonal_medians, by = "season") |>
   rename(
     ttf_eur_mwh    = ttf_median,
     net_export_mw  = exports_median
-  )
+  ) |>
+  mutate(ttf_change = 0)  # No gas price movement under weather-only
 
 scenario_df <- scenario_df |>
   mutate(pred_price_a = predict(price_model, new_data = scenario_a)$.pred)
+
+# ── Quantile predictions (q05 / q95) ────────────────────────────────
+scenario_df <- scenario_df |>
+  mutate(
+    pred_q05 = predict(price_xgb_q05, new_data = scenario_df)$.pred,
+    pred_q95 = predict(price_xgb_q95, new_data = scenario_df)$.pred
+  )
 ```
 
 ```{r}
@@ -328,8 +399,11 @@ rm(cf_input)
 # ── Hourly revenue: price × generation ───────────────────────────────
 scenario_df <- scenario_df |>
   mutate(
-    revenue_a = pred_price_a * portfolio_gen_mwh,
-    revenue_b = pred_price_b * portfolio_gen_mwh
+    revenue_a        = pred_price_a * portfolio_gen_mwh,
+    revenue_b        = pred_price_b * portfolio_gen_mwh,
+    revenue_realized = price_de_lu  * portfolio_gen_mwh,
+    revenue_q05      = pred_q05     * portfolio_gen_mwh,
+    revenue_q95      = pred_q95     * portfolio_gen_mwh
   )
 
 cat("Predicted CF range:",
@@ -346,15 +420,17 @@ cat("Mean portfolio generation:",
 
 # ── Aggregate hourly revenue to daily totals ─────────────────────────
 daily_revenue <- scenario_df |>
-  filter(!is.na(revenue_a), !is.na(revenue_b)) |>
+  filter(!is.na(revenue_a), !is.na(revenue_b), !is.na(revenue_realized)) |>
   group_by(date, season, month) |>
   summarise(
-    daily_rev_a     = sum(revenue_a),
-    daily_rev_b     = sum(revenue_b),
-    daily_gen_mwh   = sum(portfolio_gen_mwh),
-    daily_price_a   = mean(pred_price_a),
-    daily_price_b   = mean(pred_price_b),
-    n_hours         = n(),
+    daily_rev_a        = sum(revenue_a),
+    daily_rev_b        = sum(revenue_b),
+    daily_rev_realized = sum(revenue_realized),
+    daily_gen_mwh      = sum(portfolio_gen_mwh),
+    daily_price_a      = mean(pred_price_a),
+    daily_price_b      = mean(pred_price_b),
+    daily_price_real   = mean(price_de_lu),
+    n_hours            = n(),
     .groups = "drop"
   ) |>
   # Keep only complete days (24 hours)
@@ -365,44 +441,77 @@ cat("Days by season:\n")
 print(count(daily_revenue, season))
 ```
 
-## Bootstrap Simulation {#sec-bootstrap}
+## Block Bootstrap Simulation {#sec-bootstrap}
 
-For each season, we construct `r comma(params$n_sim)` synthetic months by sampling `r params$n_days_per_month` days (with replacement) from that season's historical pool. The same sampled days are used for both variants, so the difference between them isolates the contribution of TTF and cross-border flow variability to revenue risk.
+We use a **5-day block bootstrap** instead of sampling individual days independently. By resampling non-overlapping blocks of 5 consecutive days, the simulation preserves the serial correlation in weather patterns (multi-day wind droughts, persistent high-pressure systems) that drives the heaviest revenue losses. Each synthetic month consists of `r params$n_days_per_month / 5` blocks × 5 days = `r params$n_days_per_month` days, constructed independently for each season from that season's historical pool.
 
 ```{r}
 #| label: run-simulation
 #| cache: true
 
 set.seed(2026)
-n_sim           <- params$n_sim
-n_days_per_month <- params$n_days_per_month
+n_sim            <- params$n_sim
+block_size       <- 5
+n_blocks         <- params$n_days_per_month %/% block_size   # 6 blocks × 5 days = 30
 
-sim_results <- daily_revenue |>
+# ── Create non-overlapping 5-day blocks within each season ───────────
+daily_revenue <- daily_revenue |>
+  group_by(season) |>
+  arrange(date, .by_group = TRUE) |>
+  mutate(block_id = (row_number() - 1) %/% block_size) |>
+  ungroup()
+
+# ── Aggregate to block-level totals ──────────────────────────────────
+block_revenue <- daily_revenue |>
+  group_by(season, block_id) |>
+  summarise(
+    block_rev_a        = sum(daily_rev_a),
+    block_rev_b        = sum(daily_rev_b),
+    block_rev_realized = sum(daily_rev_realized),
+    block_gen_mwh      = sum(daily_gen_mwh),
+    block_price_a      = mean(daily_price_a),
+    block_price_b      = mean(daily_price_b),
+    block_price_real   = mean(daily_price_real),
+    block_days         = n(),
+    .groups = "drop"
+  ) |>
+  # Keep only complete blocks (exactly 5 days)
+  filter(block_days == block_size)
+
+cat("Complete 5-day blocks by season:\n")
+print(count(block_revenue, season))
+
+# ── Bootstrap: sample blocks with replacement ────────────────────────
+sim_results <- block_revenue |>
   group_by(season) |>
   group_modify(\(data, key) {
     n_pool <- nrow(data)
 
-    # Matrix of sampled row indices: n_days_per_month × n_sim
+    # Matrix of sampled row indices: n_blocks × n_sim
     idx <- matrix(
-      sample.int(n_pool, size = n_days_per_month * n_sim, replace = TRUE),
-      nrow = n_days_per_month, ncol = n_sim
+      sample.int(n_pool, size = n_blocks * n_sim, replace = TRUE),
+      nrow = n_blocks, ncol = n_sim
     )
 
     tibble(
-      sim_id       = 1:n_sim,
-      # Monthly revenue (EUR) — sum of sampled daily revenues
-      monthly_rev_a = colSums(matrix(data$daily_rev_a[idx],
-                                     nrow = n_days_per_month)),
-      monthly_rev_b = colSums(matrix(data$daily_rev_b[idx],
-                                     nrow = n_days_per_month)),
+      sim_id = 1:n_sim,
+      # Monthly revenue (EUR) — sum of sampled block revenues
+      monthly_rev_a        = colSums(matrix(data$block_rev_a[idx],
+                                            nrow = n_blocks)),
+      monthly_rev_b        = colSums(matrix(data$block_rev_b[idx],
+                                            nrow = n_blocks)),
+      monthly_rev_realized = colSums(matrix(data$block_rev_realized[idx],
+                                            nrow = n_blocks)),
       # Monthly generation (MWh)
-      monthly_gen   = colSums(matrix(data$daily_gen_mwh[idx],
-                                     nrow = n_days_per_month)),
-      # Average daily price (EUR/MWh) — mean of sampled daily averages
-      avg_price_a   = colMeans(matrix(data$daily_price_a[idx],
-                                      nrow = n_days_per_month)),
-      avg_price_b   = colMeans(matrix(data$daily_price_b[idx],
-                                      nrow = n_days_per_month))
+      monthly_gen          = colSums(matrix(data$block_gen_mwh[idx],
+                                            nrow = n_blocks)),
+      # Average daily price (EUR/MWh) — mean of block averages
+      avg_price_a          = colMeans(matrix(data$block_price_a[idx],
+                                             nrow = n_blocks)),
+      avg_price_b          = colMeans(matrix(data$block_price_b[idx],
+                                             nrow = n_blocks)),
+      avg_price_real       = colMeans(matrix(data$block_price_real[idx],
+                                             nrow = n_blocks))
     )
   }) |>
   ungroup()
@@ -415,25 +524,26 @@ cat("(", n_sim, "simulations ×", n_distinct(sim_results$season), "seasons )\n")
 
 ```{r}
 #| label: fig-revenue-distributions
-#| fig-cap: "Monthly revenue distributions by season and simulation variant"
+#| fig-cap: "Monthly revenue distributions by season and simulation variant. Realized uses actual historical prices; the model-based variants show how much risk the weather-only and full models capture."
 #| fig-height: 8
 
 sim_long <- sim_results |>
   pivot_longer(
-    cols = c(monthly_rev_a, monthly_rev_b),
+    cols = c(monthly_rev_a, monthly_rev_b, monthly_rev_realized),
     names_to  = "variant",
     values_to = "monthly_revenue"
   ) |>
   mutate(
     variant = recode(variant,
-      monthly_rev_a = "Weather-only",
-      monthly_rev_b = "Full historical"
+      monthly_rev_a        = "Weather-only",
+      monthly_rev_b        = "Full historical",
+      monthly_rev_realized = "Realized"
     ),
     monthly_revenue_meur = monthly_revenue / 1e6
   )
 
 ggplot(sim_long, aes(x = monthly_revenue_meur, fill = variant)) +
-  geom_density(alpha = 0.4, colour = NA) +
+  geom_density(alpha = 0.35, colour = NA) +
   geom_vline(
     data = sim_long |>
       group_by(season, variant) |>
@@ -446,7 +556,7 @@ ggplot(sim_long, aes(x = monthly_revenue_meur, fill = variant)) +
   scale_colour_manual(values = variant_colours) +
   labs(
     title    = glue("{params$portfolio_mw} MW {params$portfolio_tech} — Monthly Revenue Distribution"),
-    subtitle = "Dashed lines show median. Weather-only variant fixes TTF & net exports at seasonal medians.",
+    subtitle = "Dashed lines show median. Realized = actual prices × predicted generation.",
     x = "Monthly Revenue (M EUR)",
     y = "Density",
     fill = "Variant", colour = "Variant"
@@ -459,24 +569,25 @@ ggplot(sim_long, aes(x = monthly_revenue_meur, fill = variant)) +
 
 sim_price_long <- sim_results |>
   pivot_longer(
-    cols = c(avg_price_a, avg_price_b),
+    cols = c(avg_price_a, avg_price_b, avg_price_real),
     names_to  = "variant",
     values_to = "avg_price"
   ) |>
   mutate(
     variant = recode(variant,
-      avg_price_a = "Weather-only",
-      avg_price_b = "Full historical"
+      avg_price_a    = "Weather-only",
+      avg_price_b    = "Full historical",
+      avg_price_real = "Realized"
     )
   )
 
 ggplot(sim_price_long, aes(x = avg_price, fill = variant)) +
-  geom_density(alpha = 0.4, colour = NA) +
+  geom_density(alpha = 0.35, colour = NA) +
   facet_wrap(~ season, scales = "free_x", ncol = 2) +
   scale_fill_manual(values = variant_colours) +
   labs(
     title    = "Simulated Average Monthly Spot Price",
-    subtitle = "Weather-only variant isolates price risk from renewable variability alone",
+    subtitle = "Weather-only isolates renewable variability; Realized shows actual market outcomes",
     x = "Average Monthly Price (EUR/MWh)",
     y = "Density",
     fill = "Variant"
@@ -486,40 +597,45 @@ ggplot(sim_price_long, aes(x = avg_price, fill = variant)) +
 ```{r}
 #| label: variant-risk-summary
 
-# ── Summary table: how much wider is the full-historical distribution? ──
+# ── Summary table: how do the three variants compare? ────────────────
 variant_summary <- sim_results |>
   group_by(season) |>
   summarise(
-    sd_rev_a   = sd(monthly_rev_a) / 1e6,
-    sd_rev_b   = sd(monthly_rev_b) / 1e6,
-    sd_ratio   = sd(monthly_rev_b) / sd(monthly_rev_a),
-    cvar95_a   = compute_cvar(monthly_rev_a, 0.95) / 1e6,
-    cvar95_b   = compute_cvar(monthly_rev_b, 0.95) / 1e6,
+    sd_rev_a        = sd(monthly_rev_a) / 1e6,
+    sd_rev_b        = sd(monthly_rev_b) / 1e6,
+    sd_rev_realized = sd(monthly_rev_realized) / 1e6,
+    sd_ratio_ba     = sd(monthly_rev_b) / sd(monthly_rev_a),
+    cvar95_a        = compute_cvar(monthly_rev_a, 0.95) / 1e6,
+    cvar95_b        = compute_cvar(monthly_rev_b, 0.95) / 1e6,
+    cvar95_realized = compute_cvar(monthly_rev_realized, 0.95) / 1e6,
     .groups = "drop"
   )
 
 variant_summary |>
   gt() |>
-  fmt_number(columns = c(sd_rev_a, sd_rev_b, cvar95_a, cvar95_b), decimals = 2) |>
-  fmt_number(columns = sd_ratio, decimals = 2) |>
+  fmt_number(columns = c(sd_rev_a, sd_rev_b, sd_rev_realized,
+                          cvar95_a, cvar95_b, cvar95_realized), decimals = 2) |>
+  fmt_number(columns = sd_ratio_ba, decimals = 2) |>
   cols_label(
-    season   = "Season",
-    sd_rev_a = "SD Weather-only (M EUR)",
-    sd_rev_b = "SD Full (M EUR)",
-    sd_ratio = "SD Ratio (Full / Weather)",
-    cvar95_a = "CVaR 95% Weather (M EUR)",
-    cvar95_b = "CVaR 95% Full (M EUR)"
+    season          = "Season",
+    sd_rev_a        = "SD Weather (M EUR)",
+    sd_rev_b        = "SD Full (M EUR)",
+    sd_rev_realized = "SD Realized (M EUR)",
+    sd_ratio_ba     = "SD Ratio (Full/Weather)",
+    cvar95_a        = "CVaR 95% Weather",
+    cvar95_b        = "CVaR 95% Full",
+    cvar95_realized = "CVaR 95% Realized"
   ) |>
   tab_header(
-    title    = "Revenue Risk: Weather-Only vs Full Historical",
-    subtitle = glue("{params$portfolio_mw} MW {params$portfolio_tech} — Monthly Revenue")
+    title    = "Revenue Risk: Three Variants Compared",
+    subtitle = glue("{params$portfolio_mw} MW {params$portfolio_tech} — Monthly Revenue (M EUR)")
   ) |>
-  tab_footnote("SD ratio > 1 indicates additional risk from TTF and cross-border flow variability.")
+  tab_footnote("Realized uses actual historical prices × predicted generation. SD ratio > 1 indicates additional risk from TTF and cross-border flow variability.")
 ```
 
 # Risk Metrics {#sec-risk-metrics}
 
-How much could a bad month cost? The table below answers that for each season, showing central revenue estimates alongside downside tail risk. VaR tells you the revenue floor you'll stay above in 95% (or 99%) of months. CVaR tells you the average revenue in those worst-case months — it captures how bad "bad" actually gets.
+How much could a bad month cost? The table below answers that for each season, using **realized revenue** (actual historical prices × predicted generation) as the basis for risk metrics. This ensures VaR and CVaR reflect the revenue distribution that would have actually been observed, rather than model-filtered predictions that smooth out tail events.
 
 ```{r}
 #| label: risk-metrics-table
@@ -527,14 +643,14 @@ How much could a bad month cost? The table below answers that for each season, s
 risk_metrics <- sim_results |>
   group_by(season) |>
   summarise(
-    median_rev     = median(monthly_rev_b) / 1e6,
-    mean_rev       = mean(monthly_rev_b) / 1e6,
-    sd_rev         = sd(monthly_rev_b) / 1e6,
-    var_95         = compute_var(monthly_rev_b, 0.95) / 1e6,
-    var_99         = compute_var(monthly_rev_b, 0.99) / 1e6,
-    cvar_95        = compute_cvar(monthly_rev_b, 0.95) / 1e6,
-    cvar_99        = compute_cvar(monthly_rev_b, 0.99) / 1e6,
-    weather_share  = sd(monthly_rev_a) / sd(monthly_rev_b),
+    median_rev     = median(monthly_rev_realized) / 1e6,
+    mean_rev       = mean(monthly_rev_realized) / 1e6,
+    sd_rev         = sd(monthly_rev_realized) / 1e6,
+    var_95         = compute_var(monthly_rev_realized, 0.95) / 1e6,
+    var_99         = compute_var(monthly_rev_realized, 0.99) / 1e6,
+    cvar_95        = compute_cvar(monthly_rev_realized, 0.95) / 1e6,
+    cvar_99        = compute_cvar(monthly_rev_realized, 0.99) / 1e6,
+    weather_share  = sd(monthly_rev_a) / sd(monthly_rev_realized),
     .groups = "drop"
   )
 
@@ -556,20 +672,20 @@ risk_metrics |>
   ) |>
   tab_header(
     title    = glue("Monthly Revenue Risk — {params$portfolio_mw} MW Onshore Wind in {params$portfolio_zone}"),
-    subtitle = "All values in M EUR. Full historical variant (weather + gas + cross-border flows)."
+    subtitle = "All values in M EUR. Based on realized revenue (actual prices × predicted generation)."
   ) |>
   tab_spanner(label = "Central Estimate", columns = c(median_rev, mean_rev)) |>
   tab_spanner(label = "Spread", columns = c(sd_rev)) |>
   tab_spanner(label = "Downside Risk", columns = c(var_95, var_99, cvar_95, cvar_99)) |>
   tab_footnote(
-    "Weather Share = fraction of total revenue volatility attributable to wind variability alone. The remainder comes from gas price and cross-border flow movements."
+    "Weather Share = fraction of total revenue volatility attributable to wind variability alone (weather-only SD / realized SD). The remainder comes from gas price and cross-border flow movements."
   )
 ```
 
 ::: callout-tip
 ## Reading the table
 
-Pick a row — say Winter. The median month brings in the figure shown under Median. But in the worst 5% of months (CVaR 95%), revenue drops to the CVaR 95% figure. The **Weather Share** column is the key link back to Stage 2: it tells you how much of that revenue swing comes purely from wind variability versus gas and trade flow uncertainty. A low weather share means hedging weather alone won't cover most of your risk.
+Pick a row — say Winter. The median month brings in the figure shown under Median. But in the worst 5% of months (CVaR 95%), revenue drops to the CVaR 95% figure. The **Weather Share** column is the key link back to Stage 3: it tells you how much of that revenue swing comes purely from wind variability versus gas and trade flow uncertainty. A low weather share means hedging weather alone won't cover most of your risk.
 :::
 
 # Cross-Zone Analysis {#sec-cross-zone}
@@ -701,14 +817,14 @@ country_corrs <- delu_corr |>
   summarise(corr_de_lu = mean(corr_de_lu), .groups = "drop") |>
   bind_rows(tibble(iso3 = "DEU", corr_de_lu = 1.0))
 
-# ── Build plotly geo map ─────────────────────────────────────────────
-fig <- plot_geo(width = 900, height = 700) |>
+# ── Build plotly geo map (responsive sizing) ──────────────────────────
+fig <- plot_geo() |>
   # Choropleth background — country polygons filled by correlation
   add_trace(
     type       = "choropleth",
     locations  = country_corrs$iso3,
     z          = country_corrs$corr_de_lu,
-   colorscale = list(
+    colorscale = list(
       c(0,    "rgb(222,235,247)"),
       c(0.25, "rgb(247,247,247)"),
       c(0.5,  "rgb(253,208,162)"),
@@ -716,7 +832,6 @@ fig <- plot_geo(width = 900, height = 700) |>
       c(1,    "rgb(178,24,43)")
     ),
     zmin = 0.15, zmax = 1,
-    zmin = 0, zmax = 1,
     marker     = list(line = list(color = "rgb(180,180,180)", width = 1)),
     colorbar   = list(title = "Correlation", len = 0.4, y = 0.5),
     hoverinfo  = "none",
@@ -740,6 +855,7 @@ fig <- plot_geo(width = 900, height = 700) |>
       resolution = 50
     ),
     showlegend = FALSE,
+    autosize = TRUE,
     margin = list(t = 60, b = 20)
   )
 
@@ -796,14 +912,8 @@ fig <- fig |>
     showlegend = FALSE
   )
 
-fig |> layout(width = 900, height = 700)
+fig
 ```
-
-
-
-
-
-
 
 
 ::: callout-note
@@ -932,7 +1042,7 @@ comp_df <- comp_gen |>
   ) |>
   left_join(flows_comp, by = "datetime_utc") |>
   left_join(comp_prices, by = "datetime_utc") |>
-  left_join(ttf, by = "date") |>
+  left_join(ttf |> select(date, ttf_eur_mwh), by = "date") |>
   arrange(datetime_utc) |>
   mutate(
     renewable_share = na_kalman(renewable_share, model = "StructTS"),
@@ -949,7 +1059,7 @@ cat(glue("{comp_zone} scenario table: {nrow(comp_df)} rows, ",
 
 ## Seasonal Variance Attribution {#sec-comp-regression}
 
-We fit the same model structure as Stage 2 — OLS with the same feature groups — within each season. Partial R² measures how much price variance each feature group explains: drop the feature, see how much R² falls.
+We fit the same model structure as Stage 3 — OLS with the same feature groups — within each season. Partial R² measures how much price variance each feature group explains: drop the feature, see how much R² falls.
 
 ```{r}
 #| label: comp-partial-r2
@@ -1059,6 +1169,90 @@ r2_summary |>
 If `r comp_zone` has higher wind penetration than Germany, we'd expect renewable share to dominate price variance across more seasons — not just summer. Conversely, if gas generation plays a smaller role, TTF should matter less. These structural differences determine what a hedging strategy needs to cover in each market.
 :::
 
+
+## Post-Crisis Comparison (2023-2025) {#sec-comp-post-crisis}
+
+The full-sample analysis is dominated by the 2022 energy crisis. Restricting to the post-crisis period (2023-2025) isolates the current market regime — the environment a hedging desk faces today. This reveals whether the variance attribution structure has shifted as gas prices stabilised and renewable capacity expanded.
+
+```{r}
+#| label: comp-partial-r2-post
+#| cache: true
+
+post_start <- as.POSIXct("2023-01-01", tz = "UTC")
+
+# ── Post-crisis DE-LU ────────────────────────────────────────────────
+delu_partial_post <- map_dfr(levels(scenario_df$season), \(s) {
+  sdata <- scenario_df |>
+    filter(season == s, datetime_utc >= post_start)
+  if (nrow(sdata) < 100) return(tibble())
+  compute_partial_r2(sdata, delu_formula, feature_groups) |>
+    mutate(season = s, zone = "DE_LU")
+})
+
+# ── Post-crisis comparison zone ──────────────────────────────────────
+comp_partial_post <- map_dfr(levels(comp_df$season), \(s) {
+  sdata <- comp_df |>
+    filter(season == s, datetime_utc >= post_start)
+  if (nrow(sdata) < 100) return(tibble())
+  compute_partial_r2(sdata, full_formula, feature_groups) |>
+    mutate(season = s, zone = comp_zone)
+})
+
+partial_r2_post <- bind_rows(delu_partial_post, comp_partial_post)
+```
+
+```{r}
+#| label: fig-partial-r2-post-comparison
+#| fig-cap: "Post-crisis (2023-2025): variance attribution shifts as gas prices stabilise. Renewable share and residual load gain importance relative to TTF."
+#| fig-height: 7
+#| fig-width: 10
+
+ggplot(partial_r2_post,
+       aes(x = feature_group, y = partial_r2, fill = zone)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  facet_wrap(~ season, ncol = 2) +
+  scale_fill_manual(
+    values = c("DE_LU" = "#4393C3", setNames("#D6604D", comp_zone)),
+    labels = c("DE_LU" = "DE-LU", setNames(comp_zone, comp_zone))
+  ) +
+  scale_y_continuous(labels = percent_format()) +
+  labs(
+    title    = glue("Post-Crisis Variance Attribution — DE-LU vs {comp_zone} (2023-2025)"),
+    subtitle = "Partial R² — same structure as the full-sample analysis, restricted to the current regime",
+    x = NULL, y = "Partial R² (share of price variance explained)",
+    fill = "Zone"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#| label: tbl-partial-r2-post-summary
+
+# ── Summary: how does the dominant driver change post-crisis? ────────
+r2_post_summary <- partial_r2_post |>
+  group_by(zone, season) |>
+  slice_max(partial_r2, n = 1) |>
+  ungroup() |>
+  select(Zone = zone, Season = season,
+         `Dominant Factor` = feature_group,
+         `Partial R²` = partial_r2, `Full R²` = full_r2)
+
+r2_post_summary |>
+  gt() |>
+  fmt_percent(columns = c(`Partial R²`, `Full R²`), decimals = 1) |>
+  tab_header(
+    title    = glue("Post-Crisis: Dominant Price Driver — DE-LU vs {comp_zone} (2023-2025)"),
+    subtitle = "With gas prices stabilised, renewable variability becomes the dominant factor in more seasons"
+  )
+```
+
+::: callout-note
+## Full-sample vs post-crisis
+
+Comparing these results with the full-sample analysis above reveals the 2022 crisis effect. In the full sample, TTF dominates across all seasons and both zones. In the post-crisis period, the variance attribution spreads across renewable share, residual load, and temporal patterns — this is the market structure that determines hedging strategy today.
+:::
+
+
 # Hedging Implications {#sec-hedging}
 
 ## What the Risk Structure Means for Hedging
@@ -1071,7 +1265,7 @@ The analysis above reveals a clear seasonal pattern in what drives revenue risk 
 # ── Synthesise key findings into a narrative table ──────────────────
 hedging_df <- risk_metrics |>
   left_join(
-    variant_summary |> select(season, sd_ratio),
+    variant_summary |> select(season, sd_ratio_ba),
     by = "season"
   ) |>
   mutate(
@@ -1098,7 +1292,7 @@ hedging_df |>
     title    = "Seasonal Hedging Strategy Guide",
     subtitle = glue("{params$portfolio_mw} MW onshore wind in {params$portfolio_zone}")
   ) |>
-  tab_footnote("Weather-Driven = share of revenue volatility from wind variability; Market-Driven = gas + cross-border flows.")
+  tab_footnote("Weather-Driven = share of revenue volatility from wind variability (weather-only SD / realized SD); Market-Driven = gas + cross-border flows.")
 ```
 
 ## Cross-Border Capacity as a Risk Tool {#sec-fca}
@@ -1123,18 +1317,18 @@ Forward capacity allocation isn't just a grid operations question — it's a ris
 
 ## Simulation Convergence {#sec-convergence}
 
-Are `r comma(params$n_sim)` simulations enough for stable risk estimates? The plot below shows how CVaR 95% stabilises as the number of draws increases.
+Are `r comma(params$n_sim)` simulations enough for stable risk estimates? The plot below shows how CVaR 95% on realized revenue stabilises as the number of draws increases.
 
 ```{r}
 #| label: fig-convergence-check
-#| fig-cap: "CVaR 95% converges well before the full simulation count"
+#| fig-cap: "CVaR 95% on realized revenue converges well before the full simulation count"
 #| fig-height: 5
 
-# ── Convergence check: compute running CVaR ──────────────────────────
+# ── Convergence check: compute running CVaR on realized revenue ──────
 winter_rev <- sim_results |>
   filter(season == "Winter") |>
   arrange(sim_id) |>
-  pull(monthly_rev_b)
+  pull(monthly_rev_realized)
 
 # Compute CVaR at increasing sample sizes (every 50 draws)
 check_points <- seq(200, length(winter_rev), by = 50)
@@ -1150,13 +1344,13 @@ ggplot(convergence, aes(x = running_n, y = running_cvar)) +
   geom_line(colour = "#4393C3", linewidth = 0.5) +
   geom_hline(
     yintercept = compute_cvar(
-      sim_results |> filter(season == "Winter") |> pull(monthly_rev_b),
+      sim_results |> filter(season == "Winter") |> pull(monthly_rev_realized),
       0.95
     ) / 1e6,
     linetype = "dashed", colour = "#B2182B"
   ) +
   labs(
-    title    = "Simulation Convergence — Winter CVaR 95%",
+    title    = "Simulation Convergence — Winter CVaR 95% (Realized Revenue)",
     subtitle = "The red dashed line shows the final estimate; convergence is reached well before 10,000 draws",
     x = "Number of Simulations",
     y = "Running CVaR 95% (M EUR)"
@@ -1171,8 +1365,10 @@ This analysis makes several deliberate simplifications:
 -   **No balancing costs, grid fees, or curtailment.** Real net revenue is lower than price × generation.
 -   **No outages or maintenance.** Generation is modelled as purely weather-driven via the Stage 1 capacity factor models.
 -   **Single technology, single zone.** Real portfolios diversify across technologies and geographies — exactly the kind of diversification our cross-zone analysis quantifies.
--   **Historical resampling and the 2022 energy crisis.** The simulation draws from the full 2020–2025 period, including the 2022 gas price spike. In Variant A (weather-only), this has minimal impact — TTF is fixed at seasonal medians. In Variant B, the 2022 period widens the tails significantly. This is arguably appropriate: risk metrics should reflect scenarios that have actually occurred. The walk-forward cross-validation in Stage 2 confirms the price model generalises across both crisis and non-crisis regimes.
--   **Price model is linear (elastic net).** Extreme prices driven by scarcity events or negative pricing during high-wind periods may be underrepresented. The XGBoost benchmark in Stage 2 captures these non-linearities better but was not used here for interpretability.
+-   **Realized-price VaR/CVaR.** Risk metrics are computed on realized revenue (actual historical prices × predicted generation) rather than model-predicted prices. This avoids the problem of model predictions smoothing out tail events — extreme price spikes and negative price hours are captured at their actual magnitude. The trade-off is that realized revenue includes noise that the model would filter, but for risk measurement, capturing the full tail is more important than noise reduction.
+-   **5-day block bootstrap.** By resampling blocks of 5 consecutive days rather than individual days, the simulation preserves intra-week serial correlation in weather patterns. Multi-day wind droughts and persistent high-pressure systems are the primary drivers of the heaviest revenue losses; an iid daily bootstrap would understate tail risk by breaking these sequences apart. The block size of 5 days balances correlation preservation against the number of unique blocks available per season.
+-   **Historical resampling and the 2022 energy crisis.** The simulation draws from the full 2020–2025 period, including the 2022 gas price spike. In Variant A (weather-only), this has minimal impact — TTF is fixed at seasonal medians. In Variant B and the realized pathway, the 2022 period widens the tails significantly. This is arguably appropriate: risk metrics should reflect scenarios that have actually occurred. The walk-forward cross-validation in Stage 3 confirms the price model generalises across both crisis and non-crisis regimes.
+-   **Price model is linear (lasso).** Extreme prices driven by scarcity events or negative pricing during high-wind periods may be underrepresented by the lasso. The XGBoost benchmark in Stage 3 captures these non-linearities better; quantile XGBoost predictions (q05/q95) are available alongside the lasso for distributional analysis.
 
 ## Data Sources
 
