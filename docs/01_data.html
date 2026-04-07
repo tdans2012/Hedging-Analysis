@@ -1139,6 +1139,41 @@ Figure&nbsp;3: Monthly NA rate by cross-border flow pair. Blue = complete, red =
 <p>In the context of this analysis, the nuclear shutdown is analytically significant: it removed approximately 4 GW of baseload capacity from the DE-LU merit order, increasing the residual load that must be met by dispatchable thermal and imported power — and thereby amplifying the price sensitivity to renewable variability that Stage 2 aims to quantify.</p>
 </div>
 </div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>smard <span class="sc">|&gt;</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">month =</span> lubridate<span class="sc">::</span><span class="fu">floor_date</span>(datetime_utc, <span class="st">"month"</span>)) <span class="sc">|&gt;</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">|&gt;</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">nuclear_avg_mw =</span> <span class="fu">mean</span>(nuclear, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>) <span class="sc">|&gt;</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> month, <span class="at">y =</span> nuclear_avg_mw <span class="sc">/</span> <span class="fl">1e3</span>)) <span class="sc">+</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="at">colour =</span> <span class="st">"steelblue"</span>, <span class="at">linewidth =</span> <span class="fl">0.7</span>) <span class="sc">+</span></span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_area</span>(<span class="at">alpha =</span> <span class="fl">0.15</span>, <span class="at">fill =</span> <span class="st">"steelblue"</span>) <span class="sc">+</span></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">xintercept =</span> <span class="fu">as.POSIXct</span>(<span class="st">"2021-12-31"</span>), <span class="at">linetype =</span> <span class="st">"dashed"</span>,</span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>             <span class="at">colour =</span> <span class="st">"firebrick"</span>, <span class="at">linewidth =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_vline</span>(<span class="at">xintercept =</span> <span class="fu">as.POSIXct</span>(<span class="st">"2023-04-15"</span>), <span class="at">linetype =</span> <span class="st">"dashed"</span>,</span>
+<span id="cb18-11"><a href="#cb18-11" aria-hidden="true" tabindex="-1"></a>             <span class="at">colour =</span> <span class="st">"firebrick"</span>, <span class="at">linewidth =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotate</span>(<span class="st">"text"</span>, <span class="at">x =</span> <span class="fu">as.POSIXct</span>(<span class="st">"2021-12-31"</span>), <span class="at">y =</span> <span class="dv">6</span>, <span class="at">label =</span> <span class="st">"3 reactors</span><span class="sc">\n</span><span class="st">shut down"</span>,</span>
+<span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>           <span class="at">hjust =</span> <span class="fl">1.1</span>, <span class="at">size =</span> <span class="dv">3</span>, <span class="at">colour =</span> <span class="st">"firebrick"</span>) <span class="sc">+</span></span>
+<span id="cb18-14"><a href="#cb18-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">annotate</span>(<span class="st">"text"</span>, <span class="at">x =</span> <span class="fu">as.POSIXct</span>(<span class="st">"2023-04-15"</span>), <span class="at">y =</span> <span class="dv">4</span>, <span class="at">label =</span> <span class="st">"Final 3</span><span class="sc">\n</span><span class="st">disconnected"</span>,</span>
+<span id="cb18-15"><a href="#cb18-15" aria-hidden="true" tabindex="-1"></a>           <span class="at">hjust =</span> <span class="sc">-</span><span class="fl">0.1</span>, <span class="at">size =</span> <span class="dv">3</span>, <span class="at">colour =</span> <span class="st">"firebrick"</span>) <span class="sc">+</span></span>
+<span id="cb18-16"><a href="#cb18-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb18-17"><a href="#cb18-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"German Nuclear Generation — Atomausstieg"</span>,</span>
+<span id="cb18-18"><a href="#cb18-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"Monthly average generation showing the two-step phase-out"</span>,</span>
+<span id="cb18-19"><a href="#cb18-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Average Generation (GW)"</span>,</span>
+<span id="cb18-20"><a href="#cb18-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">caption =</span> <span class="st">"Source: SMARD / Bundesnetzagentur (CC BY 4.0)"</span></span>
+<span id="cb18-21"><a href="#cb18-21" aria-hidden="true" tabindex="-1"></a>  )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div id="fig-nuclear-phaseout" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-nuclear-phaseout-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="01_data_files/figure-html/fig-nuclear-phaseout-1.png" class="img-fluid figure-img" width="960">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-nuclear-phaseout-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: German nuclear generation (DE-LU, monthly average MW). The two-step phase-out — December 2021 and April 2023 — is clearly visible as structural breaks, not data quality issues.
+</figcaption>
+</figure>
+</div>
+</div>
+</div>
 </section>
 </section>
 <section id="sec-alignment" class="level2">
@@ -1179,8 +1214,109 @@ Figure&nbsp;3: Monthly NA rate by cross-border flow pair. Blue = complete, red =
 </tbody>
 </table>
 <p>The data are ready for Stage 1 (Weather → Generation modelling) without further cleaning. The cross-border flow gaps are the only irregularity and are handled by construction in the net-export feature (Stage 2).</p>
+<section id="sec-downstream" class="level3">
+<h3 class="anchored" data-anchor-id="sec-downstream">4.1 Variables passed downstream</h3>
+<p>The table below documents which raw variables are consumed by each downstream stage and which derived features are constructed along the way. This serves as an audit trail linking the raw data inventory above to the analytical choices in Stages 1–3.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 30%">
+<col style="width: 24%">
+<col style="width: 27%">
+<col style="width: 18%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Variable</th>
+<th>Source</th>
+<th>Used in</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>wind_onshore</code>, <code>wind_offshore</code>, <code>solar</code></td>
+<td>SMARD</td>
+<td>Stage 1 (CF models), Stage 2 (renewable share, residual load)</td>
+<td>Generation targets and feature construction</td>
+</tr>
+<tr class="even">
+<td><code>biomass</code>, <code>gas</code>, <code>hard_coal</code>, <code>lignite</code></td>
+<td>SMARD</td>
+<td>Stage 2 (price features)</td>
+<td>Thermal dispatch indicators — capture merit-order position beyond residual load</td>
+</tr>
+<tr class="odd">
+<td><code>nuclear</code></td>
+<td>SMARD</td>
+<td>Stage 2 (price features, pre-April 2023 only)</td>
+<td>Baseload generation; NAs post-phase-out are structural, not imputed</td>
+</tr>
+<tr class="even">
+<td><code>total_load</code></td>
+<td>SMARD</td>
+<td>Stage 2 (residual load, renewable share)</td>
+<td>Demand side of the merit order</td>
+</tr>
+<tr class="odd">
+<td><code>price_de_lu</code></td>
+<td>SMARD</td>
+<td>Stage 2 (target variable)</td>
+<td>Day-ahead clearing price</td>
+</tr>
+<tr class="even">
+<td><code>wind_speed_100m</code>, <code>wind_speed_10m</code></td>
+<td>ERA5</td>
+<td>Stage 1 (CF models)</td>
+<td>Hub-height wind resource</td>
+</tr>
+<tr class="odd">
+<td><code>ssrd_wm2</code></td>
+<td>ERA5</td>
+<td>Stage 1 (solar CF model), Stage 2 (price feature)</td>
+<td>Solar irradiance — both a CF driver and a direct price-relevant signal</td>
+</tr>
+<tr class="even">
+<td><code>temperature_2m</code></td>
+<td>ERA5</td>
+<td>Stage 1 (solar CF), Stage 2 (→ temp_centered, temp_squared)</td>
+<td>PV efficiency correction; centred temperature and its square capture the U-shaped demand-price relationship</td>
+</tr>
+<tr class="odd">
+<td>Cross-border flows</td>
+<td>ENTSO-E</td>
+<td>Stage 2 (net export balance)</td>
+<td>Supply tightness indicator</td>
+</tr>
+<tr class="even">
+<td>Day-ahead prices (multi-zone)</td>
+<td>ENTSO-E</td>
+<td>Stage 3 (cross-zone correlation, DK comparison)</td>
+<td>Portfolio diversification analysis</td>
+</tr>
+<tr class="odd">
+<td>TTF gas price</td>
+<td>Yahoo Finance</td>
+<td>Stage 2 (price feature)</td>
+<td>Marginal fuel cost proxy</td>
+</tr>
+</tbody>
+</table>
+<div class="callout callout-style-default callout-note callout-titled" title="Temperature feature derivation">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Note</span>Temperature feature derivation
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Rather than separate HDD/CDD variables (which have zero variance in opposite seasons — CDD is always zero in Winter, HDD near zero in Summer), Stage 2 uses a centred temperature transform: <code>temp_centered = temperature_2m - 18</code> and <code>temp_squared = temp_centered²</code>. The linear term captures direction (negative = heating demand, positive = cooling demand) while the squared term captures the U-shaped relationship where both extreme cold and extreme heat drive prices up. Both features have variance year-round, avoiding the seasonal collinearity issues that HDD/CDD introduce in per-season decompositions.</p>
+</div>
+</div>
 
 
+</section>
 </section>
 
 </main> <!-- /main -->

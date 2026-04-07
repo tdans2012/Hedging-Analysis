@@ -476,18 +476,19 @@ in Stages 1–3.
 | `price_de_lu` | SMARD | Stage 2 (target variable) | Day-ahead clearing price |
 | `wind_speed_100m`, `wind_speed_10m` | ERA5 | Stage 1 (CF models) | Hub-height wind resource |
 | `ssrd_wm2` | ERA5 | Stage 1 (solar CF model), Stage 2 (price feature) | Solar irradiance — both a CF driver and a direct price-relevant signal |
-| `temperature_2m` | ERA5 | Stage 1 (solar CF), Stage 2 (→ HDD/CDD) | PV efficiency correction; heating/cooling degree days derived in Stage 2 |
+| `temperature_2m` | ERA5 | Stage 1 (solar CF), Stage 2 (→ temp_centered, temp_squared) | PV efficiency correction; centred temperature and its square capture the U-shaped demand-price relationship |
 | Cross-border flows | ENTSO-E | Stage 2 (net export balance) | Supply tightness indicator |
 | Day-ahead prices (multi-zone) | ENTSO-E | Stage 3 (cross-zone correlation, DK comparison) | Portfolio diversification analysis |
 | TTF gas price | Yahoo Finance | Stage 2 (price feature) | Marginal fuel cost proxy |
 
-::: {.callout-note title="HDD/CDD derivation"}
-Heating degree days (HDD) and cooling degree days (CDD) are derived from ERA5
-2 m temperature in Stage 2 using a standard 18 °C base temperature:
-`HDD = max(18 - T, 0)` and `CDD = max(T - 18, 0)`. These capture
-temperature-driven load effects (heating demand in winter, cooling demand in
-summer) that the raw temperature variable does not represent directly. The
-derivation is performed at the point of feature engineering rather than here
-in Stage 0, because it is a modelling choice rather than a data-processing
-step.
+::: {.callout-note title="Temperature feature derivation"}
+Rather than separate HDD/CDD variables (which have zero variance in
+opposite seasons — CDD is always zero in Winter, HDD near zero in Summer),
+Stage 2 uses a centred temperature transform:
+`temp_centered = temperature_2m - 18` and `temp_squared = temp_centered²`.
+The linear term captures direction (negative = heating demand, positive =
+cooling demand) while the squared term captures the U-shaped relationship
+where both extreme cold and extreme heat drive prices up. Both features
+have variance year-round, avoiding the seasonal collinearity issues that
+HDD/CDD introduce in per-season decompositions.
 :::

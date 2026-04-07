@@ -29,6 +29,15 @@ library(sandwich)  # HC-robust standard errors
 library(tseries)   # ADF unit root test
 library(timeDate)  # German public holidays
 
+library(conflicted)
+conflicts_prefer(dplyr::first)
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::lag)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(purrr::map)
+conflicts_prefer(recipes::update)
+
+
 theme_report <- theme_minimal(base_size = 12) +
   theme(
     plot.title    = element_text(face = "bold"),
@@ -165,7 +174,7 @@ Electricity spot prices are mean-reverting by construction — the day-ahead auc
 
 ## 2.4 ERA5 Weather (DE-LU) {#sec-era5}
 
-ERA5 reanalysis provides hourly solar irradiance and temperature for the DE-LU zone. We derive heating degree days (HDD) and cooling degree days (CDD) from the 2-metre temperature — these capture weather-driven electricity demand for heating and cooling, which is distinct from the renewable supply channel captured by renewable share and residual load.
+ERA5 reanalysis provides hourly solar irradiance and temperature for the DE-LU zone. Rather than separate HDD/CDD variables (which have zero variance in opposite seasons), we use a centred temperature transform: `temp_centered = T - 18` captures direction (negative = heating demand, positive = cooling demand) while `temp_squared` captures the U-shaped relationship where both extreme cold and extreme heat drive prices up. Both features have variance year-round.
 
 ```{r}
 #| label: load-era5
@@ -189,18 +198,16 @@ if (temp_range[2] > 100) {
   cat("Converted from Kelvin to Celsius\n")
 }
 
-# Derive HDD and CDD (base 18°C)
+# Derive centred temperature features (base 18°C)
 era5 <- era5 |>
   mutate(
-    hdd = pmax(0, 18 - temperature_2m),
-    cdd = pmax(0, temperature_2m - 18)
+    temp_centered = temperature_2m - 18,
+    temp_squared  = temp_centered^2
   )
 
 cat(
-  "HDD range:", round(min(era5$hdd, na.rm = TRUE), 1),
-  "to", round(max(era5$hdd, na.rm = TRUE), 1), "\n",
-  "CDD range:", round(min(era5$cdd, na.rm = TRUE), 1),
-  "to", round(max(era5$cdd, na.rm = TRUE), 1), "\n",
+  "temp_centered range:", round(min(era5$temp_centered, na.rm = TRUE), 1),
+  "to", round(max(era5$temp_centered, na.rm = TRUE), 1), "\n",
   "SSRD range:", round(min(era5$ssrd_wm2, na.rm = TRUE), 1),
   "to", round(max(era5$ssrd_wm2, na.rm = TRUE), 1), "W/m²"
 )
@@ -349,7 +356,7 @@ We construct the variables that enter the price regression. Each captures a dist
 - **Thermal generation** — combined output of biomass, gas, hard coal, and lignite plants. Directly measures dispatchable thermal commitment.
 - **Renewable ramp rate** — hour-over-hour change in renewable share. Rapid ramps force costly thermal redispatch and produce price spikes.
 - **Solar irradiance (SSRD)** — surface solar radiation from ERA5. Captures the weather-driven supply channel independent of installed capacity growth.
-- **Heating/Cooling degree days (HDD/CDD)** — weather-driven demand proxies derived from ERA5 2-metre temperature (base 18°C).
+- **Centred temperature (temp_centered, temp_squared)** — weather-driven demand proxies derived from ERA5 2-metre temperature, centred at 18°C. The linear term captures heating/cooling direction; the squared term captures the U-shaped demand response.
 - **German public holidays** — binary flag for national holidays, which shift demand patterns independently of day-of-week.
 
 ```{r}
@@ -432,7 +439,7 @@ price_df <- smard |>
   fill(ttf_change, .direction = "down") |>
   # Join ERA5 weather
   left_join(
-    era5 |> select(datetime_utc, ssrd_wm2, hdd, cdd),
+    era5 |> select(datetime_utc, ssrd_wm2, temp_centered, temp_squared),
     by = "datetime_utc"
   ) |>
   # Renewable ramp rate (hour-over-hour change in renewable share)
@@ -443,7 +450,7 @@ cat("\nFeature table:", nrow(price_df), "rows\n")
 cat("NAs after join:\n")
 price_df |>
   summarise(across(c(renewable_share, residual_load, net_export_mw, ttf_eur_mwh,
-                     ttf_change, thermal_gen, renewable_ramp, ssrd_wm2, hdd, cdd),
+                     ttf_change, thermal_gen, renewable_ramp, ssrd_wm2, temp_centered, temp_squared),
                    ~ sum(is.na(.)))) |>
   glimpse()
 ```
@@ -459,7 +466,7 @@ price_df |>
 #   on a structural time series model (imputeTS) — respects the
 #   autocorrelation structure of hourly energy data better than linear
 #   interpolation.
-# Weather features (ssrd, hdd, cdd): Kalman smoothing.
+# Weather features (ssrd, temp): Kalman smoothing.
 # Renewable ramp: re-compute after imputing renewable share.
 # Nuclear is NOT imputed — post-April-2023 NAs/zeros reflect the actual
 #   phase-out of German nuclear generation.
@@ -470,7 +477,7 @@ price_df <- price_df |>
   fill(ttf_change, .direction = "downup") |>
   mutate(across(
     c(renewable_share, residual_load, net_export_mw, thermal_gen,
-      ssrd_wm2, hdd, cdd),
+      ssrd_wm2, temp_centered, temp_squared),
     ~ imputeTS::na_kalman(., model = "StructTS", smooth = TRUE)
   )) |>
   # Re-derive renewable ramp after imputation
@@ -481,7 +488,7 @@ price_df <- price_df |>
 remaining_na <- price_df |>
   summarise(across(c(price_de_lu, renewable_share, residual_load,
                      net_export_mw, ttf_eur_mwh, ttf_change,
-                     thermal_gen, renewable_ramp, ssrd_wm2, hdd, cdd),
+                     thermal_gen, renewable_ramp, ssrd_wm2, temp_centered, temp_squared),
                    ~ sum(is.na(.))))
 
 cat("Rows retained:", nrow(price_df), "\n")
@@ -503,6 +510,8 @@ With all features constructed, we examine their bivariate relationships with the
 ```{r}
 #| label: fig-price-renshare
 #| fig-cap: "Negative relationship in all seasons: higher renewable share depresses prices. The slope is steepest in winter, when displaced thermal capacity is most expensive."
+#| fig-height: 8
+#| fig-width: 10
 
 price_df |>
   ggplot(aes(renewable_share, price_de_lu)) +
@@ -519,7 +528,9 @@ price_df |>
 ```{r}
 #| label: fig-price-resload
 #| fig-cap: "Price increases non-linearly with residual load — the merit order curve steepens as thermal capacity tightens."
-
+#| fig-height: 8
+#| fig-width: 10
+#| 
 price_df |>
   ggplot(aes(residual_load, price_de_lu)) +
   geom_hex(bins = 60) +
@@ -535,6 +546,8 @@ price_df |>
 ```{r}
 #| label: fig-price-exports
 #| fig-cap: "When Germany is a net exporter (positive values), domestic supply is tighter and prices tend to be higher."
+#| fig-height: 8
+#| fig-width: 10
 
 price_df |>
   ggplot(aes(net_export_mw, price_de_lu)) +
@@ -550,13 +563,13 @@ price_df |>
 
 ```{r}
 #| label: fig-corr-matrix
-#| fig-cap: "Correlation among model features. Renewable share and residual load are strongly negatively correlated by construction. HDD and CDD are near-orthogonal, capturing distinct seasonal demand channels."
+#| fig-cap: "Correlation among model features. Renewable share and residual load are strongly negatively correlated by construction. temp_centered and temp_squared capture the demand-temperature channel with variance in all seasons."
 #| fig-height: 8
 
 cor_vars <- price_df |>
   select(price_de_lu, renewable_share, residual_load, net_export_mw,
          ttf_eur_mwh, ttf_change, thermal_gen, renewable_ramp,
-         ssrd_wm2, hdd, cdd)
+         ssrd_wm2, temp_centered, temp_squared)
 
 cor_mat <- cor(cor_vars, use = "complete.obs")
 
@@ -611,7 +624,7 @@ Before fitting the price model, we check the standard regression assumptions aga
 
 diag_fml <- price_de_lu ~ renewable_share + residual_load + net_export_mw +
   ttf_eur_mwh + ttf_change + thermal_gen + renewable_ramp +
-  ssrd_wm2 + hdd + cdd + is_holiday + season + dow + hour
+  ssrd_wm2 + temp_centered + temp_squared + is_holiday + season + dow + hour
 diag_fit <- lm(diag_fml, data = train_df)
 ```
 
@@ -706,7 +719,7 @@ The lasso is the primary model for the variance decomposition; the boosted trees
 lasso_recipe <- recipe(
   price_de_lu ~ renewable_share + residual_load + net_export_mw +
     ttf_eur_mwh + ttf_change + thermal_gen + renewable_ramp +
-    ssrd_wm2 + hdd + cdd + is_holiday + season + dow + hour,
+    ssrd_wm2 + temp_centered + temp_squared + is_holiday + season + dow + hour,
   data = train_df
 ) |>
   # Convert hour to factor for dummy encoding
@@ -728,7 +741,7 @@ lasso_recipe <- recipe(
 xgb_recipe <- recipe(
   price_de_lu ~ renewable_share + residual_load + net_export_mw +
     ttf_eur_mwh + ttf_change + thermal_gen + renewable_ramp +
-    ssrd_wm2 + hdd + cdd + is_holiday + season + dow + hour,
+    ssrd_wm2 + temp_centered + temp_squared + is_holiday + season + dow + hour,
   data = train_df
 ) |>
   step_dummy(season, dow)
@@ -1080,7 +1093,7 @@ cat(
 lasso_recipe_post <- recipe(
   price_de_lu ~ renewable_share + residual_load + net_export_mw +
     ttf_eur_mwh + ttf_change + thermal_gen + renewable_ramp +
-    ssrd_wm2 + hdd + cdd + is_holiday + season + dow + hour,
+    ssrd_wm2 + temp_centered + temp_squared + is_holiday + season + dow + hour,
   data = train_post
 ) |>
   step_mutate(hour_f = factor(hour)) |>
@@ -1192,7 +1205,7 @@ compute_partial_r2 <- function(df, response = "price_de_lu") {
   full_fml <- reformulate(
     c("renewable_share", "residual_load", "net_export_mw",
       "ttf_eur_mwh", "ttf_change",
-      "ssrd_wm2", "hdd", "cdd",
+      "ssrd_wm2", "temp_centered", "temp_squared",
       "thermal_gen",
       "renewable_ramp",
       "hour_f", "dow", "is_holiday"),
@@ -1204,7 +1217,7 @@ compute_partial_r2 <- function(df, response = "price_de_lu") {
     "Residual load"    = "residual_load",
     "Net exports"      = "net_export_mw",
     "Gas price (TTF)"  = c("ttf_eur_mwh", "ttf_change"),
-    "Weather (solar, HDD/CDD)" = c("ssrd_wm2", "hdd", "cdd"),
+    "Weather (solar, temperature)" = c("ssrd_wm2", "temp_centered", "temp_squared"),
     "Thermal dispatch"  = "thermal_gen",
     "Renewable ramp"    = "renewable_ramp",
     "Temporal (hour x season + dow + holiday)" = c("hour_f", "dow", "is_holiday")
@@ -1269,7 +1282,7 @@ partial_r2_post <- compute_partial_r2(price_post_r2)
 
 ```{r}
 #| label: fig-partial-r2-post
-#| fig-cap: "Post-crisis (2023-2025): with gas prices stabilised, renewable share and residual load emerge as the primary price drivers. Weather (solar, HDD/CDD) and thermal dispatch now contribute measurably. The seasonal pattern is clear — renewables dominate summer, residual load dominates shoulder seasons."
+#| fig-cap: "Post-crisis (2023-2025): with gas prices stabilised, renewable share and residual load emerge as the primary price drivers. Weather (solar, temperature) and thermal dispatch now contribute measurably. The seasonal pattern is clear — renewables dominate summer, residual load dominates shoulder seasons."
 #| fig-height: 7
 
 partial_r2_post |>
@@ -1347,13 +1360,14 @@ feat_imp <- FeatureImp$new(predictor_obj, loss = "mse", n.repetitions = 10)
 
 feat_imp$results |>
   as_tibble() |>
+  slice_max(importance, n = 25) |>
   mutate(feature = str_replace_all(feature, "_", " ") |> fct_reorder(importance)) |>
   ggplot(aes(importance, feature)) +
   geom_col(fill = "#457B9D", width = 0.6) +
   geom_vline(xintercept = 1, linetype = "dashed", colour = "grey50") +
   labs(
     title = "Permutation Feature Importance (Lasso on Test Set)",
-    subtitle = "Ratio of permuted MSE to baseline MSE — higher = more important",
+    subtitle = "Top 25 features — ratio of permuted MSE to baseline MSE",
     x = "Importance (MSE ratio)", y = NULL
   )
 ```
@@ -1368,7 +1382,7 @@ feat_imp$results |>
 4. **Residual load is most important in shoulder seasons** (spring, autumn), when neither renewable nor gas effects dominate.
 5. **Net exports have a measurable but secondary effect**, consistent with Germany's central position in the CWE interconnected market. The net export × season interaction reveals that exports tighten supply most in winter when neighbouring zones draw on German baseload.
 6. **Thermal dispatch captures information beyond residual load.** The combined output of biomass, gas, hard coal, and lignite plants reflects generator-level commitment decisions (must-run, CHP obligations) that residual load alone does not capture.
-7. **Weather variables (solar irradiance, HDD/CDD) add explanatory power** on top of renewable share, because they capture the *demand-side* weather channel (heating and cooling load) independently from the supply-side channel already embedded in renewable generation.
+7. **Weather variables (solar irradiance, centred temperature) add explanatory power** on top of renewable share, because they capture the *demand-side* weather channel (heating and cooling load) independently from the supply-side channel already embedded in renewable generation. Using centred temperature rather than HDD/CDD avoids seasonal zero-variance issues.
 8. **Renewable ramp rates contribute to intra-day price volatility**, particularly during evening ramp-down of solar in summer and rapid wind changes in autumn. The hour-over-hour change in renewable share explains a small but distinct fraction of variance that the level of renewable share misses.
 9. **Temporal patterns (hour × season dummies, day-of-week, holidays) capture structural demand cycles** — contributing consistently across all seasons. German public holidays shift demand patterns independently of day-of-week effects.
 10. **Heteroskedasticity is a structural feature of electricity markets**, not a model failure. All results are reported in raw EUR/MWh with HC-robust standard errors for valid inference. The ADF test confirms the price series is stationary, validating regression on levels.
@@ -1376,7 +1390,7 @@ feat_imp$results |>
 12. **Quantile XGBoost provides distributional predictions** for risk analysis, producing a 90% prediction interval that brackets extreme price events. These feed directly into the Stage 4 VaR/CVaR framework alongside the post-crisis lasso.
 :::
 
-These findings inform the risk quantification in the next section: the seasonal attribution structure means that a hedging strategy must account for *which* risk factor dominates in the delivery period. In today's market, a summer forward position is primarily a renewable variability bet; shoulder-season contracts depend on residual load dynamics; weather-driven demand (HDD/CDD) adds an independent risk channel in winter and summer; and the ever-present tail risk of another fuel cost shock requires monitoring through the quantile framework.
+These findings inform the risk quantification in the next section: the seasonal attribution structure means that a hedging strategy must account for *which* risk factor dominates in the delivery period. In today's market, a summer forward position is primarily a renewable variability bet; shoulder-season contracts depend on residual load dynamics; weather-driven demand (temperature extremes) adds an independent risk channel year-round; and the ever-present tail risk of another fuel cost shock requires monitoring through the quantile framework.
 
 
 ::: {.callout-note title="Data Attribution"}

@@ -36,6 +36,15 @@ library(imputeTS)
 library(scales)
 library(timeDate)  # German public holidays
 
+library(conflicted)
+conflicts_prefer(dplyr::first)
+conflicts_prefer(dplyr::select)
+conflicts_prefer(dplyr::lag)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(purrr::map)
+conflicts_prefer(dplyr::recode)
+
+
 # ── Theme ─────────────────────────────────────────────────────────────
 theme_report <- theme_minimal(base_size = 12) +
   theme(
@@ -76,11 +85,11 @@ if (max(era5_delu$temperature_2m, na.rm = TRUE) > 100) {
   era5_delu <- era5_delu |> mutate(temperature_2m = temperature_2m - 273.15)
 }
 
-# Derive HDD and CDD (base 18°C)
+# Derive centred temperature features (base 18°C)
 era5_delu <- era5_delu |>
   mutate(
-    hdd = pmax(0, 18 - temperature_2m),
-    cdd = pmax(0, temperature_2m - 18)
+    temp_centered = temperature_2m - 18,
+    temp_squared  = temp_centered^2
   )
 
 # ── ENTSO-E cross-border flows ───────────────────────────────────────
@@ -206,7 +215,7 @@ A wind farm that sells all output on the day-ahead spot market earns revenue = p
 
 ## Feature Engineering {#sec-features}
 
-We reconstruct the same feature set used in the Stage 3 price model: renewable share, residual load, net export balance, TTF gas price (level and daily change), thermal generation, solar irradiance, HDD/CDD, renewable ramp rate, holidays, hour, day-of-week, and season.
+We reconstruct the same feature set used in the Stage 3 price model: renewable share, residual load, net export balance, TTF gas price (level and daily change), thermal generation, solar irradiance, centred temperature, renewable ramp rate, holidays, hour, day-of-week, and season.
 
 ```{r}
 #| label: de-lu-net-exports
@@ -258,9 +267,9 @@ scenario_df <- smard |>
     month = factor(month(datetime_utc, label = TRUE), ordered = FALSE),
     is_holiday = as.integer(date %in% holiday_dates)
   ) |>
-  # Join ERA5 weather (ssrd, HDD, CDD)
+  # Join ERA5 weather (ssrd, temperature)
   left_join(
-    era5_delu |> select(datetime_utc, ssrd_wm2, hdd, cdd),
+    era5_delu,
     by = "datetime_utc"
   ) |>
   # Join cross-border flows
@@ -287,9 +296,12 @@ scenario_df <- scenario_df |>
     residual_load      = na_kalman(residual_load, model = "StructTS"),
     net_export_mw      = na_kalman(net_export_mw, model = "StructTS"),
     thermal_gen        = na_kalman(thermal_gen, model = "StructTS"),
+    wind_speed_100m    = na_kalman(wind_speed_100m, model = "StructTS"),
+    wind_speed_10m     = na_kalman(wind_speed_10m, model = "StructTS"),
+    temperature_2m     = na_kalman(temperature_2m, model = "StructTS"),
     ssrd_wm2           = na_kalman(ssrd_wm2, model = "StructTS"),
-    hdd                = na_kalman(hdd, model = "StructTS"),
-    cdd                = na_kalman(cdd, model = "StructTS"),
+    temp_centered      = na_kalman(temp_centered, model = "StructTS"),
+    temp_squared       = na_kalman(temp_squared, model = "StructTS"),
     ttf_eur_mwh        = zoo::na.locf(zoo::na.locf(ttf_eur_mwh, na.rm = FALSE),
                                        fromLast = TRUE),
     ttf_change         = zoo::na.locf(zoo::na.locf(ttf_change, na.rm = FALSE),
@@ -303,7 +315,7 @@ scenario_df <- scenario_df |>
 
 n_remaining_na <- scenario_df |>
   select(renewable_share, residual_load, net_export_mw, ttf_eur_mwh,
-         ttf_change, thermal_gen, ssrd_wm2, hdd, cdd) |>
+         ttf_change, thermal_gen, ssrd_wm2, temp_centered, temp_squared) |>
   summarise(across(everything(), \(x) sum(is.na(x))))
 
 cat("Remaining NAs after imputation:\n")
@@ -750,6 +762,9 @@ ggplot(cor_long, aes(x = zone_1, y = zone_2, fill = correlation)) +
 #| label: fig-zone-correlation-map
 #| fig-cap: "Price correlation with DE-LU across European bidding zones — hover for details"
 #| cache: true
+#| fig-height: 10
+#| fig-width: 10
+
 
 library(plotly)
 
@@ -818,7 +833,7 @@ country_corrs <- delu_corr |>
   bind_rows(tibble(iso3 = "DEU", corr_de_lu = 1.0))
 
 # ── Build plotly geo map (responsive sizing) ──────────────────────────
-fig <- plot_geo() |>
+fig <- plot_geo(height = 700) |>
   # Choropleth background — country polygons filled by correlation
   add_trace(
     type       = "choropleth",
