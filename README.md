@@ -21,16 +21,17 @@ for hedging demand across bidding zones?
 
 | Notebook | Topic |
 |---|---|
-| `01_data.qmd` | Data sources & QA — SMARD, ENTSO-E, ERA5, TTF |
-| `02_weather.qmd` | Weather → generation capacity factor modelling |
-| `03_prices.qmd` | Price decomposition — elastic net, variance attribution |
-| `04_risk.qmd` | Monte Carlo revenue risk & hedging implications |
+| `01_data.qmd` | Data sources & QA — SMARD, ENTSO-E, ERA5, TTF. Downstream variable audit trail. |
+| `02_weather.qmd` | Weather → generation capacity factor modelling. Centred temperature features. ACF/PACF residual diagnostics. |
+| `03_prices.qmd` | Price decomposition — LASSO with hour × season dummies, thermal dispatch, TTF level + change, ADF stationarity test, expanding-window CV, post-crisis model. Variance attribution via partial R². |
+| `04_risk.qmd` | Monte Carlo revenue risk with block bootstrap, realized-price VaR/CVaR, cross-zone correlation, DK_1 comparison (full-sample + post-crisis). |
 
 ---
 
 ## Data Sources
 
-- **SMARD (Bundesnetzagentur)** — DE-LU hourly generation, load, day-ahead price
+- **SMARD (Bundesnetzagentur)** — DE-LU hourly generation by fuel type 
+  (wind, solar, biomass, gas, coal, lignite, nuclear), load, day-ahead price
 - **ENTSO-E Transparency Platform** — day-ahead prices (17 zones), cross-border 
   flows, generation by type
 - **Copernicus ERA5** — hourly wind speed, solar irradiance, temperature 
@@ -41,9 +42,34 @@ for hedging demand across bidding zones?
 
 ## Stack
 
-**R:** tidyverse, tidymodels, arrow, plotly, gt, httr2, tidyquant, imputeTS  
+**R:** tidyverse, tidymodels, arrow, plotly, gt, httr2, tidyquant, imputeTS, 
+iml, car, lmtest, sandwich, tseries, timeDate, conflicted  
 **Python:** entsoe-py, cdsapi, xarray, geopandas, pyarrow  
 **Publishing:** Quarto → GitHub Pages
+
+---
+
+## Key Methodological Choices
+
+- **Hour × season dummies** replace sinusoidal encoding — captures the 
+  asymmetric diurnal price profile (morning ramp, midday solar dip, evening 
+  peak) that sinusoidal harmonics cannot represent.
+- **Centred temperature** (`T - 18°C` and its square) replaces HDD/CDD — 
+  avoids seasonal zero-variance issues while preserving the U-shaped 
+  demand-temperature relationship.
+- **TTF level + daily change** — addresses non-stationarity (confirmed via 
+  ADF test) by separating the marginal fuel cost channel from day-over-day 
+  gas market shocks.
+- **Expanding-window CV** — ensures later folds see the full history including 
+  the 2022 energy crisis, rather than training on a fixed window that may 
+  straddle the structural break.
+- **Post-crisis elastic net** (2023–2025) fitted alongside the full-sample 
+  model — reflects today's market structure for forward-looking risk analysis.
+- **Realized-price VaR/CVaR** — risk metrics use actual historical prices × 
+  predicted generation, avoiding the systematic tail compression that linear 
+  price models introduce.
+- **Block bootstrap** (5-day blocks) — preserves multi-day weather persistence 
+  that iid daily sampling understates.
 
 ---
 
@@ -76,10 +102,10 @@ Store both in a project-level `.Renviron` file (not committed to the repo).
 
 ### Rendering
 ```bash
-quarto render
+quarto render --cache-refresh
 ```
 
-Pre-rendered output is committed to `docs/` and served via GitHub Actions.
+Pre-rendered output is committed to `docs/` and served via GitHub Pages.
 
 ---
 

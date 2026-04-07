@@ -22,22 +22,31 @@ The analysis is structured as a four-stage pipeline, each building on the last.
 **[1. Data Sources & QA](01_data.qmd)**  
 Ingestion and quality audit of SMARD generation data, ENTSO-E cross-border 
 flows and prices, Copernicus ERA5 reanalysis weather, and TTF gas futures. 
-Covers 17 bidding zones, 52,000+ hourly observations, 2020–2025.
+Covers 17 bidding zones, 52,000+ hourly observations, 2020–2025. Includes a 
+downstream variable audit table documenting what feeds each analytical stage.
 
 **[2. Weather → Generation](02_weather.qmd)**  
 ERA5 wind speed and solar irradiance mapped to capacity factors for onshore 
 wind, offshore wind, and solar PV in DE-LU. Tidymodels workflows with temporal 
-cross-validation. Cross-zone weather profiles for CWE and Nordic markets.
+cross-validation. Cross-zone weather profiles for CWE and Nordic markets. 
+Centred temperature features derived for the price model. ACF/PACF residual 
+diagnostics confirm model adequacy.
 
 **[3. Price Decomposition](03_prices.qmd)**  
-Elastic net regression decomposes DE-LU day-ahead price variance into 
-contributions from renewable share, residual load, TTF gas price, and 
-cross-border net exports. Partial R² and permutation importance by season.
+LASSO regression with hour × season dummies decomposes DE-LU day-ahead price 
+variance into contributions from renewable share, residual load, thermal 
+dispatch (gas, coal, lignite), TTF gas price (level + daily change), centred 
+temperature, solar irradiance, and cross-border net exports. ADF test confirms 
+TTF non-stationarity. Expanding-window cross-validation. Post-crisis elastic 
+net (2023–2025) fitted alongside full-sample model. Partial R² and permutation 
+importance by season.
 
 **[4. Risk Quantification & Hedging Implications](04_risk.qmd)**  
-Monte Carlo revenue simulation for a stylised 400 MW onshore wind portfolio. 
-Two variants isolate weather-driven versus total price risk. VaR, CVaR, and 
-seasonal hedging strategy recommendations across CWE bidding zones.
+Block-bootstrap Monte Carlo revenue simulation for a stylised 400 MW onshore 
+wind portfolio. Two variants isolate weather-driven versus total price risk. 
+VaR and CVaR computed on realized historical prices (not model predictions). 
+Cross-zone correlation analysis with geographic mapping. Post-crisis DK_1 
+comparison. Seasonal hedging strategy recommendations across CWE bidding zones.
 
 ---
 

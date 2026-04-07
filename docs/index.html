@@ -159,13 +159,13 @@ ul.task-list li input[type="checkbox"] {
 <section id="stages" class="level2">
 <h2 class="anchored" data-anchor-id="stages">Stages</h2>
 <p><strong><a href="./01_data.html">1. Data Sources &amp; QA</a></strong><br>
-Ingestion and quality audit of SMARD generation data, ENTSO-E cross-border flows and prices, Copernicus ERA5 reanalysis weather, and TTF gas futures. Covers 17 bidding zones, 52,000+ hourly observations, 2020–2025.</p>
+Ingestion and quality audit of SMARD generation data, ENTSO-E cross-border flows and prices, Copernicus ERA5 reanalysis weather, and TTF gas futures. Covers 17 bidding zones, 52,000+ hourly observations, 2020–2025. Includes a downstream variable audit table documenting what feeds each analytical stage.</p>
 <p><strong><a href="./02_weather.html">2. Weather → Generation</a></strong><br>
-ERA5 wind speed and solar irradiance mapped to capacity factors for onshore wind, offshore wind, and solar PV in DE-LU. Tidymodels workflows with temporal cross-validation. Cross-zone weather profiles for CWE and Nordic markets.</p>
+ERA5 wind speed and solar irradiance mapped to capacity factors for onshore wind, offshore wind, and solar PV in DE-LU. Tidymodels workflows with temporal cross-validation. Cross-zone weather profiles for CWE and Nordic markets. Centred temperature features derived for the price model. ACF/PACF residual diagnostics confirm model adequacy.</p>
 <p><strong><a href="./03_prices.html">3. Price Decomposition</a></strong><br>
-Elastic net regression decomposes DE-LU day-ahead price variance into contributions from renewable share, residual load, TTF gas price, and cross-border net exports. Partial R² and permutation importance by season.</p>
+LASSO regression with hour × season dummies decomposes DE-LU day-ahead price variance into contributions from renewable share, residual load, thermal dispatch (gas, coal, lignite), TTF gas price (level + daily change), centred temperature, solar irradiance, and cross-border net exports. ADF test confirms TTF non-stationarity. Expanding-window cross-validation. Post-crisis elastic net (2023–2025) fitted alongside full-sample model. Partial R² and permutation importance by season.</p>
 <p><strong><a href="./04_risk.html">4. Risk Quantification &amp; Hedging Implications</a></strong><br>
-Monte Carlo revenue simulation for a stylised 400 MW onshore wind portfolio. Two variants isolate weather-driven versus total price risk. VaR, CVaR, and seasonal hedging strategy recommendations across CWE bidding zones.</p>
+Block-bootstrap Monte Carlo revenue simulation for a stylised 400 MW onshore wind portfolio. Two variants isolate weather-driven versus total price risk. VaR and CVaR computed on realized historical prices (not model predictions). Cross-zone correlation analysis with geographic mapping. Post-crisis DK_1 comparison. Seasonal hedging strategy recommendations across CWE bidding zones.</p>
 <hr>
 <p><em>Data: SMARD (CC BY 4.0) · ENTSO-E Transparency Platform · Copernicus ERA5 · Yahoo Finance</em></p>
 
