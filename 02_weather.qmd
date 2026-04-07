@@ -118,27 +118,29 @@ cat("DE-LU SMARD rows:", nrow(smard),
 ```
 
 
-## 2.1 Derived weather features: HDD & CDD {#sec-hdd-cdd}
+## 2.1 Derived weather features: centred temperature {#sec-temp-features}
 
-Heating degree days (HDD) and cooling degree days (CDD) translate raw
-temperature into demand-relevant signals. When temperatures drop below
-the base (18 °C), heating load rises roughly in proportion; when they
-exceed it, cooling demand kicks in. These are standard features in
-electricity load and price modelling across European markets.
+Temperature drives electricity demand through both heating (cold → high
+load) and cooling (heat → air conditioning). Rather than separate HDD
+and CDD variables — which have zero variance in opposite seasons (CDD
+is always zero in German winters, HDD near zero in summer) — we use a
+centred transform that has variance year-round:
 
-We compute hourly HDD and CDD here and save them alongside the existing
-ERA5 variables so that Stage 2 (price decomposition) can ingest them
-directly.
+- `temp_centered = temperature_2m - 18`: negative in heating conditions,
+  positive in cooling conditions.
+- `temp_squared = temp_centered²`: captures the U-shaped relationship
+  where both extreme cold *and* extreme heat drive prices up.
+
+This avoids the collinearity issues that HDD/CDD introduce in per-season
+decompositions while preserving the same demand-signal information.
 
 ```{r}
-#| label: derive-hdd-cdd
-
-hdd_cdd_base <- 18  # °C — standard European base temperature
+#| label: derive-temp-features
 
 era5_all <- era5_all |>
   mutate(
-    hdd = pmax(hdd_cdd_base - temperature_2m, 0),
-    cdd = pmax(temperature_2m - hdd_cdd_base, 0)
+    temp_centered = temperature_2m - 18,
+    temp_squared  = temp_centered^2
   )
 
 # Update DE-LU subset
@@ -147,19 +149,19 @@ era5 <- era5_all |> filter(zone == zone_file) |> select(-zone)
 # Summary check
 era5 |>
   summarise(
-    `HDD mean` = round(mean(hdd), 2),
-    `HDD max`  = round(max(hdd), 1),
-    `CDD mean` = round(mean(cdd), 2),
-    `CDD max`  = round(max(cdd), 1),
-    `Hours T < 18°C` = sum(temperature_2m < hdd_cdd_base),
-    `Hours T > 18°C` = sum(temperature_2m > hdd_cdd_base)
+    `temp_centered mean` = round(mean(temp_centered), 2),
+    `temp_centered min`  = round(min(temp_centered), 1),
+    `temp_centered max`  = round(max(temp_centered), 1),
+    `temp_squared mean`  = round(mean(temp_squared), 1),
+    `Hours T < 18°C (heating)` = sum(temperature_2m < 18),
+    `Hours T > 18°C (cooling)` = sum(temperature_2m > 18)
   ) |>
-  knitr::kable(caption = "HDD/CDD summary (DE-LU, 18 °C base)")
+  knitr::kable(caption = "Centred temperature summary (DE-LU, 18 °C base)")
 ```
 
 ```{r}
-#| label: fig-hdd-cdd-seasonal
-#| fig-cap: "Seasonal distribution of hourly HDD and CDD (DE-LU). HDD dominates in winter; CDD is concentrated in summer but much smaller in magnitude — consistent with Germany's heating-dominated climate."
+#| label: fig-temp-seasonal
+#| fig-cap: "Seasonal distribution of centred temperature (DE-LU). The linear term is negative in heating conditions and positive in cooling conditions; the squared term captures demand extremes in both directions. Both features have non-zero variance in every season."
 #| fig-width: 10
 #| fig-height: 5
 
@@ -172,17 +174,18 @@ era5 |>
       TRUE                                  ~ "Autumn"
     ) |> factor(levels = c("Winter", "Spring", "Summer", "Autumn"))
   ) |>
-  pivot_longer(c(hdd, cdd), names_to = "variable", values_to = "value") |>
-  filter(value > 0) |>
-  mutate(variable = recode(variable, hdd = "HDD (18°C base)", cdd = "CDD (18°C base)")) |>
+  pivot_longer(c(temp_centered, temp_squared), names_to = "variable", values_to = "value") |>
+  mutate(variable = recode(variable,
+    temp_centered = "temp_centered (T - 18°C)",
+    temp_squared  = "temp_squared (T - 18°C)²")) |>
   ggplot(aes(x = value, fill = season)) +
   geom_histogram(bins = 50, alpha = 0.7, position = "identity") +
   facet_wrap(~ variable, scales = "free") +
   scale_fill_brewer(palette = "Set2") +
   labs(
-    title   = "Heating & Cooling Degree Distribution by Season",
-    subtitle = "Hourly values > 0, DE-LU (18 °C base temperature)",
-    x = "Degree hours", y = "Count", fill = NULL,
+    title   = "Centred Temperature Features by Season",
+    subtitle = "Both features have variance in every season — no zero-variance issues",
+    x = NULL, y = "Count", fill = NULL,
     caption = "Source: Copernicus ERA5 reanalysis"
   )
 ```
@@ -1084,11 +1087,14 @@ irradiance follows a clear latitude gradient. These physical differences
 drive the cross-zone variation in renewable generation patterns — and
 ultimately in the price dynamics — explored in Stage 2.
 
-**Derived weather features.** HDD and CDD (@sec-hdd-cdd) translate ERA5
-temperature into demand-relevant signals for Stage 2. Germany's climate
-is heating-dominated: HDD values are substantially larger and more
-variable than CDD, consistent with winter load being the primary
-temperature-driven demand component in the DE-LU zone.
+**Derived weather features.** Centred temperature features
+(@sec-temp-features) translate ERA5 temperature into demand-relevant
+signals for Stage 2. Using `temp_centered` (T - 18°C) and
+`temp_squared` rather than separate HDD/CDD ensures non-zero variance
+in every season, avoiding collinearity issues in per-season
+decompositions. Germany's heating-dominated climate means the negative
+(heating) side of the distribution is substantially wider than the
+positive (cooling) side.
 
 **DE-LU capacity factor models.** ERA5 100 m wind speed is the dominant
 predictor of wind generation capacity factors, with the cubic polynomial
