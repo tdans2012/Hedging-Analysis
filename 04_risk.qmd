@@ -11,7 +11,7 @@ params:
   portfolio_mw: 400
   portfolio_tech: "wind_onshore"
   portfolio_zone: "DE-LU"
-  comparison_zone: "DK_1"
+  comparison_zone: "NO_4"
   n_sim: 10000
   n_days_per_month: 30
 ---
