@@ -43,7 +43,7 @@ conflicts_prefer(dplyr::lag)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(purrr::map)
 conflicts_prefer(dplyr::recode)
-
+conflicts_prefer(plotly::layout)
 
 # ── Theme ─────────────────────────────────────────────────────────────
 theme_report <- theme_minimal(base_size = 12) +
